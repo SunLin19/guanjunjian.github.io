@@ -164,12 +164,11 @@ root@chenximing-MS-7823:/home/chenximing# tree -L 3 /var/lib/docker/overlay/6abc
 “6abc47......”为**读写层**，“6abc47.....-init”为**初始层**。
 初始层中大多是初始化容器环境时，与容器相关的环境信息，
 如容器主机名，主机host信息以及域名服务文件等。**所有对容器做出的改变都记录在读写层**。
-从上面的结果来看，读写层比初始层在upper目录下多了一个root目录。
 
 lower-id、merged、upper、work这4个文件系统对象都是OverlayFS的artifacts，
 "lower-id"文件包含容器使用镜像的顶层镜像层的id。也就是lowerdir层的id：
 
-```shell
+```bash
 root@chenximing-MS-7823:/home/chenximing# cat /var/lib/docker/overlay/6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d/lower-id
     
 ed271f2159e3c9de18ede980e4e2ecb0ef39b96927d446ba93deab0b6ff1a8e3
@@ -188,7 +187,7 @@ OverlayFS要求"work"目录正常工作，它用于诸如copy-up之类的操作.
 
 在刚才创建的容器中创建一个文件：
 
-```shell
+```bash
 root@8963ffb422fa:/# touch file
     
 root@8963ffb422fa:/# echo "hello world" > file

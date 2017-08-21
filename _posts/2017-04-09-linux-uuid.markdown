@@ -47,7 +47,7 @@ SATA/USB/SCSI接口的磁盘使用SCSI模块来驱动，磁盘标识为/dev/sd[a
 
 可以通过如下方式查看存储设备的UUID：
 
-```shell
+```bash
 #方法一:
 ls -l /dev/disk/by-uuid/
 #方法二:
