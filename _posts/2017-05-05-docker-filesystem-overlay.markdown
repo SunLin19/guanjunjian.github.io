@@ -391,7 +391,7 @@ $ modprobe overlay
 然后启动docker服务:
 
 ```bash
-sudo service docker start
+$ sudo service docker start
 ```
 
 **方法二**:
