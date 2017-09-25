@@ -48,7 +48,7 @@ overlay只使用2层，意味着多层镜像不会被实现为多个OverlayFS层
 
 当创建一个容器时，overlay驱动连接代表镜像层顶层的目录(只读)和一个代表容器层的新目录(读写)。
 
-## 例子：镜像和容器的磁盘结构[overlay]
+### 例子：镜像和容器的磁盘结构[overlay]
 
 ```shell
 root@chenximing-MS-7823:/home/chenximing# tree /var/lib/docker/overlay/
@@ -220,7 +220,7 @@ root@chenximing-MS-7823:/home/chenximing# tree -L 3 /var/lib/docker/overlay/6abc
 
 因此，overlay2在使用docker层相关的命令时，能提供更好的性能(如：docker build、docker commit)。而且overlay2消耗的inode节点更少。
 
-## 例子：镜像和容器的基于磁盘的结构[overlay2]
+### 例子：镜像和容器的基于磁盘的结构[overlay2]
 
 docker pull ubuntu拉取完一个5层的Ubuntu镜像后，/var/lib/docker/overlay2下可以看到6个目录:
 
@@ -334,7 +334,7 @@ root@chenximing-MS-7823:/home/chenximing# cat /var/lib/docker/overlay2/2558ed8dd
 l/7H7MUMX4IOAVLIJ2YPLR5MZOO5:l/5DJFQNGXSA5CVOC6NA6HPUCXXB:l/JWB63ZJDZOTK5N22OMR5BKUVMG:l/X76VPZDDKIW3GLWBFUHKDFBEPE:l/UZHRLLTPQMODQQYBLN6NOT6N2K:l/EGQNS3O24ONBL5BJSGNTX4NP6E
 ```
 
-# 容器的读写
+## 容器的读写
 
 对于读，考虑下列3种场景：
 
