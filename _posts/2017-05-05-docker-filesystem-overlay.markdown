@@ -216,7 +216,7 @@ root@chenximing-MS-7823:/home/chenximing# tree -L 3 /var/lib/docker/overlay/6abc
 
 ## overlay2 
 
-和overlay为了实现“两个目录反映多层镜像“而使用硬链接不同，overlay2驱动天生支持多个低OverlayFS层。(最多128)
+和overlay为了实现“两个目录反映多层镜像“而使用硬链接不同，overlay2驱动天生支持多层。(最多128)
 
 因此，overlay2在使用docker层相关的命令时，能提供更好的性能(如：docker build、docker commit)。而且overlay2消耗的inode节点更少。
 
