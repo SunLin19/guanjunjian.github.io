@@ -33,7 +33,7 @@ docker1.12后推出的overlay2在inode的利用方面比ovelay更有效，**over
 
 ## overlay
 
-如下图所示，OverlayFS在主机上用到2个目录，这2个目录被看成是overlayfs的层。
+如下图所示，Overlay在主机上用到2个目录，这2个目录被看成是overlay的层。
 upperdir为容器层、lowerdir为镜像层使用联合挂载技术将它们挂载在同一目录(merged)下，提供统一视图。
 
 ![](/img/in-post/post-docker-filesystem/overlay_constructs.jpg)
