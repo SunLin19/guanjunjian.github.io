@@ -18,9 +18,9 @@ type: page
 
 ## 联系我
 
-* GitHub：[guan](https://github.com/arkingc)
-* email：243744327@qq.com
-* [Weibo](http://weibo.com/2873651382/profile?rightmod=1&wvr=6&mod=personinfo&is_all=1)
+* GitHub：[guanjunjian](https://github.com/guanjunjian)
+* email：215173975@qq.com
+* [Weibo]()
 * [知乎]()
 * [Facebook]()
 * [Twitter]()
