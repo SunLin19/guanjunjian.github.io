@@ -18,7 +18,7 @@ type: page
 
 ## 联系我
 
-* GitHub：[brkingc](https://github.com/arkingc)
+* GitHub：[guanjunjian](https://github.com/arkingc)
 * email：243744327@qq.com
 * [Weibo](http://weibo.com/2873651382/profile?rightmod=1&wvr=6&mod=personinfo&is_all=1)
 * [知乎]()
