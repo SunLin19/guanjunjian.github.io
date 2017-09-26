@@ -28,4 +28,4 @@ type: page
 
 ## 友情链接
 
-[Gaohaoyang](https://gaohaoyang.github.io) \| [Hux](http://huangxuan.me) 
+[Gaohaoyang](https://gaohaoyang.github.io) \| [Hux](http://huangxuan.me) \| [arkingc](https://arkingc.github.io/) \| [xubo](http://blog.xbblfz.site/)
