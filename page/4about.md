@@ -20,6 +20,7 @@ type: page
 
 * GitHub：[guanjunjian](https://github.com/guanjunjian)
 * email：215173975@qq.com
+* QQ：215173975
 
 
 ## 关于本站
