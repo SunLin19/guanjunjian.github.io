@@ -14,17 +14,13 @@ type: page
 
 ## 关于我
 
-...
+研究生程序员一枚.
 
 ## 联系我
 
 * GitHub：[guanjunjian](https://github.com/guanjunjian)
 * email：215173975@qq.com
-* [Weibo]()
-* [知乎]()
-* [Facebook]()
-* [Twitter]()
-* [豆瓣]()
+
 
 ## 关于本站
 
