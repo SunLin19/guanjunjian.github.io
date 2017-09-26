@@ -32,4 +32,4 @@ type: page
 
 ## 友情链接
 
-[Gaohaoyang](https://gaohaoyang.github.io) \| [Hux](http://huangxuan.me) \| [Arkingc](arkingc.github.io) \| [Xubo](http://blog.xbblfz.site/)
+[Gaohaoyang](https://gaohaoyang.github.io) \| [Hux](http://huangxuan.me) \| [Arkingc](https://arkingc.github.io) \| [Xubo](http://blog.xbblfz.site/)
