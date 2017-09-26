@@ -14,13 +14,13 @@ type: page
 
 ## 关于我
 
-...
+研究生程序员一枚。
 
 ## 联系我
 
-* GitHub：[arkingc](https://github.com/arkingc)
-* email：243744327@qq.com
-* [Weibo](http://weibo.com/2873651382/profile?rightmod=1&wvr=6&mod=personinfo&is_all=1)
+* GitHub：[guanjunjian](https://github.com/guanjunjian)
+* email：215173975@qq.com
+* [Weibo]()
 * [知乎]()
 * [Facebook]()
 * [Twitter]()
@@ -32,4 +32,4 @@ type: page
 
 ## 友情链接
 
-[Gaohaoyang](https://gaohaoyang.github.io) \| [Hux](http://huangxuan.me) 
+[Gaohaoyang](https://gaohaoyang.github.io) \| [Hux](http://huangxuan.me) \| [Arkingc](https://github.com/arkingc) \| [Xubo](http://blog.xbblfz.site/)
