@@ -16,7 +16,7 @@ tags:
 > 本文从*docker run --net bridge ubuntu* 追踪docker network初始化的过程，同时了解docker对网络数据包的处理流程。 
 > 源码阅读基于docker [Version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
-## 1.docker client的入口mian
+## 1. docker client的入口mian
 
 ### 1.1 源码
 
@@ -51,7 +51,7 @@ func main() {
 
 ### 1.3 cobra.Command
 
-#### 1.3.1首先介绍cobra这个库的简单使用:
+#### 1.3.1 首先介绍cobra这个库的简单使用:
 
 ```go
 package main
@@ -105,11 +105,11 @@ func main() {
 * 为命令添加选项
 * 执行命令
 
-### 1.3.2 docker中cobra.Command的使用
+#### 1.3.2 docker中cobra.Command的使用
 
 docker中`Command`的使用就体现在`commands.AddCommands()`。在`commands.AddCommands(cmd, dockerCli)`中，将run、build等一些命令的执行函数添加到commands中。
 
-## 2.runContainer()
+## 2. runContainer()
 
 ### 2.1 源码
 
@@ -141,5 +141,3 @@ func runContainer(dockerCli *command.DockerCli, opts *runOptions, copts *contain
 
 * *[docker源码阅读笔记二---Xubo](http://blog.xbblfz.site/2017/04/18/docker%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%BA%8C/)*
 * *[docker命令解析](http://blog.csdn.net/idwtwt/article/details/52733235)*
-
-[i1]: https://docs.docker.com/engine/userguide/storagedriver/images/aufs_layers.jpg
