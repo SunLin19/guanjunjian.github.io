@@ -17,7 +17,7 @@ tags:
 
 
 
-[原文链接](https://docs.docker.com/engine/userguide/storagedriver/overlayfs-driver/#container-reads-and-writes-with-overlay)
+
 
 OverlayFS是和AUFS相似的联合文件系统(union filesystem)，它有如下特点：
 * *设计简洁；*
@@ -36,7 +36,7 @@ docker1.12后推出的overlay2在inode的利用方面比ovelay更有效，**over
 如下图所示，Overlay在主机上用到2个目录，这2个目录被看成是overlay的层。
 upperdir为容器层、lowerdir为镜像层使用联合挂载技术将它们挂载在同一目录(merged)下，提供统一视图。
 
-![](/img/in-post/post-docker-filesystem/overlay_constructs.jpg)
+
 
 *[图片来源: Docker文档][i1]*
 
