@@ -19,7 +19,7 @@ tags:
 
 
 
-## 1.docker client的入口
+## 1.docker client的入口testtest
 
 AUFS 是一种 Union File System（联合文件系统），它可以把不同位置的目录合并mount到同一目录下。
 其中，最上层目录**读写**(r/w)，其余目录**只读**(read only)。
