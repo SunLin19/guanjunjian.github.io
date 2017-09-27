@@ -1,7 +1,7 @@
 ---
 layout:     post
-title:      " docker源码阅读之一---docker client命令行执行流程 "
-date:       2017-9-26 22:40:00 
+title:      " docker源码阅读之二---docker daemon启动流程 "
+date:       2017-9-27 15:00:00 
 author:     "guanjunjian"
 categories: Docker源码阅读
 tags:
@@ -12,13 +12,13 @@ tags:
 * content
 {:toc}
 
-> 开始阅读docker源码，最终目的是了解docker network的实现;
+> 上文分析了docker client段对于docker run命令的处理，client将create和start命令发送给daemon;
 > 
-> 本文从*docker run --net bridge ubuntu* 追踪docker network初始化的过程，同时了解docker对网络数据包的处理流程;
+> 本文主要分析daemon的启动过程，以及对create和start命令的处理;
 >  
 > 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
-## 1. docker client的入口main
+## 1. docker daemon的入口main
 
 ### 1.1 源码
 
