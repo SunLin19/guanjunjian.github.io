@@ -46,9 +46,9 @@ func main() {
 
 
 
-### 2. newDaemonCommand()
+## 2. newDaemonCommand()
 
-#### 2.1  newDaemonCommand()主代码
+### 2.1  newDaemonCommand()主代码
 
 newDaemonCommand()包含daemon初始化的流程，主要代码为:
 
@@ -99,7 +99,7 @@ func runDaemon(opts daemonOptions) error {
 }
 ```
 
-### 2.2.1 NewDaemonCli()
+#### 2.2.1 NewDaemonCli()
 
 `NewDaemonCli()`创建一个DaemonCli结构体对象，该结构体包含配置信息，配置文件，参数信息，APIServer,Daemon对象，authzMiddleware（认证插件），代码如下:
 
@@ -128,7 +128,7 @@ type Server struct {
 }
 ```
 
-### 2.2.2 daemonCli.start(opts) 
+#### 2.2.2 daemonCli.start(opts) 
 
 daemonCli.start(opts)的主要代码以实现如下：
 
