@@ -12,8 +12,10 @@ tags:
 * content
 {:toc}
 
-> 开始阅读docker源码，最终目的是了解docker network的实现。
-> 本文从*docker run --net bridge ubuntu* 追踪docker network初始化的过程，同时了解docker对网络数据包的处理流程。 
+> 开始阅读docker源码，最终目的是了解docker network的实现;
+> 
+> 本文从*docker run --net bridge ubuntu* 追踪docker network初始化的过程，同时了解docker对网络数据包的处理流程;
+>  
 > 源码阅读基于docker [Version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
 ## 1. docker client的入口mian
