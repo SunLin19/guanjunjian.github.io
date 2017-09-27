@@ -88,9 +88,11 @@ func newDaemonCommand() *cobra.Command {
 }
 ```
 
+下面将分析runDaemon(opts)函数。
+
 ### 2.2 runDaemon(opts)
 
-runDaemon是在daemon command使用时被调用，主要代码为
+runDaemon()是在daemon command使用时被调用，主要代码为：
 
 ```go
 func runDaemon(opts daemonOptions) error {
@@ -98,6 +100,8 @@ func runDaemon(opts daemonOptions) error {
 	daemonCli.start(opts) ////启动daemonCli
 }
 ```
+
+它包括了NewDaemonCli()和daemonCli.start(opts)两个部分，下面将详细分析这两个部分。
 
 #### 2.2.1 NewDaemonCli()
 
