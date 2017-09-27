@@ -22,7 +22,6 @@ tags:
 
 ### 1.1 源码
 
-
 docker client的main函数位于[moby/cmd/docker/docker.go](https://github.com/moby/moby/blob/17.05.x/cmd/docker/docker.go#L161#184)，代码的主要内容是：
 
 ```go
@@ -34,7 +33,6 @@ func main() {
 	...
 }
 ```
-
 
 **这部分代码的主要工作是：**
 
