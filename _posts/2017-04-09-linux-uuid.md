@@ -2,7 +2,7 @@
 layout:     post
 title:      " Linux 存储设备的UUID"
 date:       2017-04-09 10:51:00
-author:     "guanjunjian"
+author:     "Arkingc"
 categories: Linux管理
 tags:
     - Linux管理
