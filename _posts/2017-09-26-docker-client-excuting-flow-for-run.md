@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      " docker源码阅读---docker client命令行执行流程 "
+title:      " docker源码阅读1---docker client命令行执行流程 "
 date:       2017-9-26 22:40:00 
 author:     "guanjunjian"
 categories: Docker源码阅读
@@ -16,7 +16,7 @@ tags:
 > 
 > 本文从*docker run --net bridge ubuntu* 追踪docker network初始化的过程，同时了解docker对网络数据包的处理流程;
 >  
-> 源码阅读基于docker [Version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
+> 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
 ## 1. docker client的入口mian
 
