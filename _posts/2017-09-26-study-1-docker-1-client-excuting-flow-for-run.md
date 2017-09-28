@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      " docker源码阅读之一---docker client命令行执行流程 "
+title:      "study1.docker源码阅读之一---docker client命令行执行流程 "
 date:       2017-9-26 22:40:00 
 author:     "guanjunjian"
 categories: Docker源码阅读
@@ -47,7 +47,7 @@ func main() {
 
 ### 1.2 流程图
 
-![](/img/in-post/post-docker-client-excuting-flow-for-run/docker-client-main.png)
+![](/img/study/study-1-docker-1-client-excuting-flow-for-run/docker-client-main.png)
 
 我们需要追踪的是docker run的执行流程，从流程图中可以看到，从`cmd := newDockerCommand(dockerCli)`的一步步进行下去，可以追踪到`runContainer(dockerCli,opts,copts,contianerConfig)`，而这里就是run命令的执行函数。
 在具体了解`runContainer()`的具体执行之前，先了解一下`cobra.Command`结构体。
@@ -132,7 +132,7 @@ func runContainer(dockerCli *command.DockerCli, opts *runOptions, copts *contain
 
 ### 2.2 流程图
 
-![](/img/in-post/post-docker-client-excuting-flow-for-run/docker-client-runContainer.png)
+![](/img/study/study-1-docker-1-client-excuting-flow-for-run/docker-client-runContainer.png)
 
 在`ContainerCreate()`和`ContainerStart()`中分别向daemon发送了create和start命令。下一步，就需要到docker daemon中分析daemon对create和start的处理。
 

@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      " docker源码阅读之二---docker daemon启动流程 "
+title:      "study2.docker源码阅读之二---docker daemon启动流程 "
 date:       2017-9-27 18:00:00 
 author:     "guanjunjian"
 categories: Docker源码阅读
@@ -42,7 +42,7 @@ func main() {
 
 ### 1.2 流程图
 
-![](/img/in-post/post-docker-daemon-excuting-flow-for-run/docker-daemon-main.png)
+![](/img/study/study-2-docker-2-daemon-excuting-flow-for-run/docker-daemon-main.png)
 
 
 

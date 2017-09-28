@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      " docker源码阅读之三---从serverapi到docker run的调用 "
+title:      "study3.docker源码阅读之三---从serverapi到docker run的调用 "
 date:       2017-9-28 10:00:00 
 author:     "guanjunjian"
 categories: Docker源码阅读
@@ -57,7 +57,7 @@ func initRouter(s *apiserver.Server, d *daemon.Daemon, c *cluster.Cluster) {
 
 ### 1.2 流程图
 
-![](/img/in-post/post-docker-serverapi-to-run-func/docker-daemon-initRouter.png)
+![](/img/study/study-3-docker-3-serverapi-to-run-func-3/docker-daemon-initRouter.png)
 
 从图中可以看到，`docker run`发出的`"/containers/create"`和`"/containers/{name:.*}/start"`最后会分别路由到`postContainersCreate`和`postContainersStart`函数，在这两个函数中分别做容器创建和启动的工作，这两个函数将在后面的文章中分析，本文将进一步分析initRouter这个函数，了解清楚路由是如何分发的。
 路由初始化过程分为以下三个步骤：
