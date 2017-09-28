@@ -65,7 +65,7 @@ func (daemon *Daemon) ContainerCreate(params types.ContainerCreateConfig) (conta
 下面详细分析daemon.containerCreate(params, false)。
 
 
-## 2. daemon.containerCreate(params, false)
+## 2. daemon.containerCreate()
 
 daemon.containerCreate(params, false)的实现位于[moby/daemon/create.go](https://github.com/moby/moby/blob/17.05.x/daemon/create.go#L36#L67)，主要代码为：
 
@@ -91,7 +91,7 @@ func (daemon *Daemon) containerCreate(params types.ContainerCreateConfig, manage
 }
 ```
 
-## 3. daemon.create(params, managed)
+## 3. daemon.create()
 
 daemon.create(params, managed)的实现位于[moby/daemon/create.go](https://github.com/moby/moby/blob/17.05.x/daemon/create.go#L70#L156)，主要代码为：
 
@@ -146,7 +146,7 @@ func (daemon *Daemon) create(params types.ContainerCreateConfig, managed bool) (
 }
 ```
 
-## 4. daemon.newContainer(params.Name, params.Config, params.HostConfig, imgID, managed)
+## 4. daemon.newContainer()
 
 daemon.newContainer()主要生成一个container结构体，这里包括id和name的确定。它的主要代码为：
 
@@ -200,4 +200,4 @@ func (daemon *Daemon) newContainer(name string, config *containertypes.Config, h
 
 ## 参考
 
-* *[【docker 17 源码分析】docker run container 源码分析一 docker create](http://blog.csdn.net/zhonglinzhang/article/details/53435590)*
+* *[docker 17 源码分析 docker run container 源码分析一 docker create](http://blog.csdn.net/zhonglinzhang/article/details/53435590)*
