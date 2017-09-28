@@ -32,14 +32,16 @@ func initRouter(s *apiserver.Server, d *daemon.Daemon, c *cluster.Cluster) {
 	decoder := runconfig.ContainerDecoder{}//获取解码器
 	routers := []router.Router{
 		...
-		container.NewRouter(d, decoder),   //与container的路由，例如/containers/create,/containers/{name:.*}/start
+		//与container的路由，例如/containers/create,/containers/{name:.*}/start
+		container.NewRouter(d, decoder),   
 		...
 	}
 	//如果允许网络控制，则添加network相关的路由
 	if d.NetworkControllerEnabled() {
 		routers = append(routers, network.NewRouter(d, c))
 	}
-	if d.HasExperimental() {//如果是experimental模式将所有路由数据项中的experimental模式下的api路由功能激活
+	//如果是experimental模式将所有路由数据项中的experimental模式下的api路由功能激活
+	if d.HasExperimental() {
 		for _, r := range routers {
 			for _, route := range r.Routes() {
 				if experimental, ok := route.(router.ExperimentalRoute); ok {
@@ -48,7 +50,8 @@ func initRouter(s *apiserver.Server, d *daemon.Daemon, c *cluster.Cluster) {
 			}
 		}
 	}
-	s.InitRouter(debug.IsEnabled(), routers...)  //根据设置好的路由表routers来初始化apiServer的路由器
+	//根据设置好的路由表routers来初始化apiServer的路由器
+	s.InitRouter(debug.IsEnabled(), routers...)  
 }
 ```
 
@@ -59,9 +62,9 @@ func initRouter(s *apiserver.Server, d *daemon.Daemon, c *cluster.Cluster) {
 从图中可以看到，`docker run`发出的`"/containers/create"`和`"/containers/{name:.*}/start"`最后会分别路由到`postContainersCreate`和`postContainersStart`函数，在这两个函数中分别做容器创建和启动的工作，这两个函数将在后面的文章中分析，本文将进一步分析initRouter这个函数，了解清楚路由是如何分发的。
 路由初始化过程分为以下三个步骤：
 
-* 1. 向路由表routers中添加路由数据项router
-* 2. 检验experimental模式，若为experimental模式则激活该模式下的api路由功能
-* 3. 根据路由表初始化apiServer路由器
+* 向路由表routers中添加路由数据项router
+* 检验experimental模式，若为experimental模式则激活该模式下的api路由功能
+* 根据路由表初始化apiServer路由器
 
 
 下面挑选步骤1和步骤3详细讲解。
