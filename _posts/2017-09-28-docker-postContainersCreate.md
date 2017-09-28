@@ -177,7 +177,7 @@ func (daemon *Daemon) newContainer(name string, config *containertypes.Config, h
 	base := daemon.newBaseContainer(id)
 	//对container一些属性进行初始化，包括网络方面的
 	base.Created = time.Now().UTC()
-	base.Managed = managed
+	base.Managed = managed   //在daemon.containerCreate(params, false)中传入的，managed==false
 	base.Path = entrypoint
 	base.Args = args //FIXME: de-duplicate from config
 	base.Config = config
