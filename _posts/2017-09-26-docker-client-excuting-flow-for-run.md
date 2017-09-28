@@ -134,7 +134,7 @@ func runContainer(dockerCli *command.DockerCli, opts *runOptions, copts *contain
 
 ![](/img/in-post/post-docker-client-excuting-flow-for-run/docker-client-runContainer.png)
 
-在`ConatinerCreate()`和`ContainerStart()`中分别向daemon发送了create和start命令。下一步，就需要到docker daemon中分析daemon对create和start的处理。
+在`ContainerCreate()`和`ContainerStart()`中分别向daemon发送了create和start命令。下一步，就需要到docker daemon中分析daemon对create和start的处理。
 
 ## 结语
 
