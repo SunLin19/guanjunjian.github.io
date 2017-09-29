@@ -239,7 +239,81 @@ func (cli *DaemonCli) start(opts daemonOptions) (err error) {
 }
 ```
 
-这部分代码实现了daemonCli、apiserver的初始化，其中apiserver的功能是处理client段发送请求，并将请求路由出去。所以`initRouter(api, d, c)`中包含了api路由的具体实现，将会在下文中分析。
+这部分代码实现了daemonCli、apiserver的初始化，其中apiserver的功能是处理client段发送请求，并将请求路由出去。所以`initRouter(api, d, c)`中包含了api路由的具体实现，将会在下一篇博客中分析。下面再分析步骤13中的`daemon.NewDaemon()`
+
+##### 2.2.2.1 从daemon.NewDaemon()分析daemon启动过程中的initNetworkController()
+
+从daemon.NewDaemon()到initNetworkController()的过程为：daemon.NewDaemon()--->d.restore()--->daemon.initNetworkController()
+
+首先，从NewDaemon()中分析，主要代码如下：
+
+```go
+func NewDaemon(config *config.Config, registryService registry.Service, containerdRemote libcontainerd.Remote, pluginStore *plugin.Store) (daemon *Daemon, err error) {
+	...
+	if err := d.restore(); err != nil {
+		return nil, err
+	}
+	...
+}
+```
+
+再到d.restore()的调用，主要代码如下，
+
+```go
+func (daemon *Daemon) restore() error {
+	...
+	daemon.netController, err = daemon.initNetworkController(daemon.configStore, activeSandboxes)
+	...
+}
+```
+
+下面详细分析daemon启动过程中的网络初始化`daemon.initNetworkController()`,代码位于[moby/daemon/daemon_unix.go#L727#L774](https://github.com/moby/moby/blob/17.05.x/daemon/daemon_unix.go#L727#L774)。
+
+函数主要做了以下两件事情：
+
+* 初始化controller
+* 初始化null(none的驱动)/host/bridge三个内置网络
+
+主要代码为：
+
+
+```go
+func (daemon *Daemon) initNetworkController(config *config.Config, activeSandboxes map[string]interface{}) (libnetwork.NetworkController, error) {
+	netOptions, err := daemon.networkOptions(config, daemon.PluginStore, activeSandboxes)
+	//生成controller对象
+	controller, err := libnetwork.New(netOptions...)
+	// Initialize default network on "null"
+	if n, _ := controller.NetworkByName("none"); n == nil {
+		_, err := controller.NewNetwork("null", "none", "", libnetwork.NetworkOptionPersist(true))
+	}
+
+	// Initialize default network on "host"
+	if n, _ := controller.NetworkByName("host"); n == nil {
+		_, err := controller.NewNetwork("host", "host", "", libnetwork.NetworkOptionPersist(true))
+	}
+
+	// Clear stale bridge network
+	n, err := controller.NetworkByName("bridge"); err == nil {
+		n.Delete(); 
+	}
+
+	if !config.DisableBridge {
+		// Initialize default driver "bridge"
+		err := initBridgeDriver(controller, config); err != nil {
+			return nil, err
+		}
+	} else {
+		removeDefaultBridgeInterface()
+	}
+
+	return controller, nil
+}
+```
+
+在部分代码会与后文[study5.docker源码阅读之五---daemon端对于container start的处理]()有关系。
+
+
+
 
 ## 结语
 
