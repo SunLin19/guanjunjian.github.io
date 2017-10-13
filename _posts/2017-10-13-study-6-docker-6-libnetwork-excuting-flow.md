@@ -40,7 +40,7 @@ tags:
 
 流程图如下（图中main函数位于[moby/cmd/dockerd/docker.go#100#122](https://github.com/moby/moby/blob/17.05.x/cmd/dockerd/docker.go#L100#L122)）：
 
-![](/img/study/study-6-docker-6-libnetwork-excuting-flow/libnetwork-excute-flow-container-start.png)
+![](/img/study/study-6-docker-6-libnetwork-excuting-flow/libnetwork-excute-flow-daemon-init.png.png)
 
 ## 3. libnetwork在docker创建时的工作
 
