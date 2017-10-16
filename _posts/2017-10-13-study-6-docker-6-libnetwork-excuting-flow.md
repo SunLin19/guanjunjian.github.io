@@ -426,10 +426,145 @@ func (c *controller) getNetworksFromStore() ([]*network, error) {
 
 ### 3.3.4 sandbox---getNetworkSandbox()、NewSandbox()
 
-### 3.3.5 endpoint---CreateEndpoint()
+#### 3.3.4.1 getNetworkSandbox()
 
+首先分析`getNetworkSandbox()`，代码位于[moby/daemon/container_operations.go#L578#L588](https://github.com/moby/moby/blob/17.05.x/daemon/container_operations.go#L578#L588)，主要代码为：
 
+```go
+func (daemon *Daemon) getNetworkSandbox(container *container.Container) libnetwork.Sandbox {
+	var sb libnetwork.Sandbox
+	daemon.netController.WalkSandboxes(func(s libnetwork.Sandbox) bool {
+		if s.ContainerID() == container.ID {
+			sb = s
+			return true
+		}
+		return false
+	})
+	return sb
+}
+```
 
+继续看`daemon.netController.WalkSandboxes()`，代码位于[moby/vendor/github.com/docker/libnetwork/controller.go#L1057#L1063](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L1057#L1063)，主要代码为：
+
+```go
+func (c *controller) WalkSandboxes(walker SandboxWalker) {
+	for _, sb := range c.Sandboxes() {
+		if walker(sb) {
+			return
+		}
+	}
+}
+```
+
+接着到`c.Sandboxes()`，代码位于[moby/vendor/github.com/docker/libnetwork/controller.go#L1040#L1055](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L1040#L1055)，主要代码为：
+
+```go
+func (c *controller) Sandboxes() []Sandbox {
+	list := make([]Sandbox, 0, len(c.sandboxes))
+	//sandboxes为sandboxTable类型
+	for _, s := range c.sandboxes {
+		// Hide stub sandboxes from libnetwork users
+		if s.isStub {
+			continue
+		}
+		list = append(list, s)
+	}
+	return list
+}
+```
+
+所以，查找的sandbox最终从controller的sandboxes中取得。
+
+#### 3.3.4.2 NewSandbox()
+
+接着分析`NewSandbox()`，代码位于[moby/vendor/github.com/docker/libnetwork/controller.go#L929#L1038](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L929#L1038)，主要代码为：
+
+```go
+func (c *controller) NewSandbox(containerID string, options ...SandboxOption) (sBox Sandbox, err error) {
+	var sb *sandbox
+	c.Lock()
+	//对于container已经有sandbox的处理
+	for _, s := range c.sandboxes {
+		if s.containerID == containerID {
+			// If not a stub, then we already have a complete sandbox.
+			if !s.isStub {
+				sbID := s.ID()
+				c.Unlock()
+				return nil, types.ForbiddenErrorf("container %s is already present in sandbox %s", containerID, sbID)
+			}
+
+			// We already have a stub sandbox from the
+			// store. Make use of it so that we don't lose
+			// the endpoints from store but reset the
+			// isStub flag.
+			sb = s
+			sb.isStub = false
+			break
+		}
+	}
+	c.Unlock()
+	//首先创建sandbox和process options,Key的生成由option决定
+	if sb == nil {
+		sb = &sandbox{
+			id:                 stringid.GenerateRandomID(),
+			containerID:        containerID,
+			endpoints:          epHeap{},
+			epPriority:         map[string]int{},
+			populatedEndpoints: map[string]struct{}{},
+			config:             containerConfig{},
+			controller:         c,
+			extDNS:             []extDNSEntry{},
+		}
+	}
+	sBox = sb
+	//调用的Golang的"container/heap"包，将sandbox的endpoints初始化为heap操作
+	heap.Init(&sb.endpoints)
+	//处理options
+	sb.processOptions(options...)
+	c.Lock()
+	if sb.ingress && c.ingressSandbox != nil {
+		c.Unlock()
+		return nil, types.ForbiddenErrorf("ingress sandbox already present")
+	}
+	//将新建的sandbox赋值给controller的ingressSandbox
+	if sb.ingress {
+		c.ingressSandbox = sb
+		//将
+		sb.config.hostsPath = filepath.Join(c.cfg.Daemon.DataDir, "/network/files/hosts")
+		sb.config.resolvConfPath = filepath.Join(c.cfg.Daemon.DataDir, "/network/files/resolv.conf")
+		sb.id = "ingress_sbox"
+	}
+	c.Unlock()
+	//创建host file、更新parentHosts、启动DNS
+	if err = sb.setupResolutionFiles(); err != nil {
+		return nil, err
+	}
+	//使用默认sandbox
+	if sb.config.useDefaultSandBox {
+		c.sboxOnce.Do(func() {
+			c.defOsSbox, err = osl.NewSandbox(sb.Key(), false, false)
+		})
+		//osSbox类型为osl.Sandbox，Package osl describes structures and interfaces which abstract os entities
+		sb.osSbox = c.defOsSbox
+	}
+	//将新建的sandbox注册到controller的sandboxes数组中
+	c.Lock()
+	c.sandboxes[sb.id] = sb
+	c.Unlock()
+	err = sb.storeUpdate()
+	return sb, nil
+}
+```
+
+### 3.3.5 endpoint---n.CreateEndpoint()
+
+`n.CreateEndpoint()`位于[moby/vendor/github.com/docker/libnetwork/network.go#L889#L990](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L889#L990)，主要代码为：
+
+```go
+func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoint, error) {
+	
+}
+```
 
 
 
