@@ -529,7 +529,6 @@ func (c *controller) NewSandbox(containerID string, options ...SandboxOption) (s
 	//将新建的sandbox赋值给controller的ingressSandbox
 	if sb.ingress {
 		c.ingressSandbox = sb
-		//将
 		sb.config.hostsPath = filepath.Join(c.cfg.Daemon.DataDir, "/network/files/hosts")
 		sb.config.resolvConfPath = filepath.Join(c.cfg.Daemon.DataDir, "/network/files/resolv.conf")
 		sb.id = "ingress_sbox"
@@ -558,8 +557,7 @@ func (c *controller) NewSandbox(containerID string, options ...SandboxOption) (s
 
 ### 3.3.5 endpoint---n.CreateEndpoint()
 
-#### 3.3.5.1 n.CreateEndpoint()
-`n.CreateEndpoint()`位于[moby/vendor/github.com/docker/libnetwork/network.go#L889#L990](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L889#L990)，主要代码为：
+`n.CreateEndpoint()`实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L889#L990](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L889#L990)，主要代码为：
 
 ```go
 func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoint, error) {
@@ -609,7 +607,7 @@ func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoi
 	if err = ep.assignAddress(ipam, true, n.enableIPv6 && !n.postIPv6); err != nil {
 		return nil, err
 	}
-	//向network中加入endpoint，在3.3.5.2中继续分析
+	//向network中加入endpoint，在3.3.5.1中继续分析
 	if err = n.addEndpoint(ep); err != nil {
 		return nil, err
 	}
@@ -631,20 +629,86 @@ func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoi
 }
 ```
 
-#### 3.3.5.2 n.addEndpoint(ep)
+#### 3.3.5.1 n.addEndpoint(ep)
 
 `n.addEndpoint(ep)`的实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L874#L887](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L874#L887)，主要代码为：
 
 ```go
 func (n *network) addEndpoint(ep *endpoint) error {
-
+	//获得网络驱动,3.3.5.2分析
+	d, err := n.driver(true)
+	//调用网络驱动创建endpoint，有bridge、host等,3.3.5.3分析
+	err = d.CreateEndpoint(n.id, ep.id, ep.Interface(), ep.generic)
+	return nil
 }
 ```
 
+#### 3.3.5.2 n.driver(true)
 
+`n.driver(true)`的实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L760#L781](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L760#L781)，主要代码为：
 
+```go
+func (n *network) driver(load bool) (driverapi.Driver, error) {
+	//根据网络类型获取网络驱动，如果没有，则看load是否为true，是true的话，就载入该网络类型的驱动
+	d, cap, err := n.resolveDriver(n.networkType, load)
+	c := n.getController()
+	//returns true if Cluster is participating as a worker/agent，查看该节点是worker还是agent.
+	isAgent := c.isAgent()
+	n.Lock()
+	// If load is not required, driver, cap and err may all be nil
+	if cap != nil {
+		n.scope = cap.DataScope
+	}
+	if isAgent || n.dynamic {
+		// If we are running in agent mode then all networks
+		// in libnetwork are local scope regardless of the
+		// backing driver.
+		n.scope = datastore.LocalScope
+	}
+	n.Unlock()
+	return d, nil
+}
+```
 
+#### 3.3.5.3 d.CreateEndpoint()
 
+现在看d.CreateEndpoint(n.id, ep.id, ep.Interface(), ep.generic)调用，d即driver的种类有：bridge、host、ipvlan、macvlan、overlay、remote六种，每种驱动都有`CreateEndpoint()`的实现，这里我们先来看看brdige驱动的`CreateEndpoint()`，实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L902#L1081](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L902#L1081)，主要代码为：
+
+```go
+func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo, epOptions map[string]interface{}) error {
+	//InitOSContext initializes OS context while configuring network resources
+	defer osl.InitOSContext()()
+	// Get the network handler and make sure it exists
+	d.Lock()
+	//根据network id获得container的network，类型为bridgeNetwork
+	n, ok := d.networks[nid]
+	dconfig := d.config
+	d.Unlock()
+	
+	// Sanity check,检查network的连通性
+	n.Lock()
+	if n.id != nid {
+		n.Unlock()
+		return InvalidNetworkIDError(nid)
+	}
+	n.Unlock()
+	// Check if endpoint id is good and retrieve correspondent endpoint.类型为bridgeEndpoint
+	ep, err := n.getEndpoint(eid)
+	// Endpoint with that id exists either on desired or other sandbox
+	//这里有一些不理解，ep!=nil，说明id是我们所有需要的或存在于别的sandbox中？
+	if ep != nil {
+		return driverapi.ErrEndpointExists(eid)
+	}
+	// Try to convert the options to endpoint configuration
+	epConfig, err := parseEndpointOptions(epOptions)
+	// Create and add the endpoint
+	n.Lock()
+	endpoint := &bridgeEndpoint{id: eid, nid: nid, config: epConfig}
+	n.endpoints[eid] = endpoint
+	n.Unlock()
+
+}	
+```
 
 
 
