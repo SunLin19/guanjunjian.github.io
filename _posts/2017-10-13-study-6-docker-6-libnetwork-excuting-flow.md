@@ -558,14 +558,88 @@ func (c *controller) NewSandbox(containerID string, options ...SandboxOption) (s
 
 ### 3.3.5 endpoint---n.CreateEndpoint()
 
+#### 3.3.5.1 n.CreateEndpoint()
 `n.CreateEndpoint()`位于[moby/vendor/github.com/docker/libnetwork/network.go#L889#L990](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L889#L990)，主要代码为：
 
 ```go
 func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoint, error) {
-	
+	//endpoint结构体
+	ep := &endpoint{name: name, generic: make(map[string]interface{}), iface: &endpointInterface{}}
+	//随机生成一个endpoint ID
+	ep.id = stringid.GenerateRandomID()
+	// Initialize ep.network with a possibly stale copy of n. We need this to get network from
+	// store. But once we get it from store we will have the most uptodate copy possibly.
+	//ep.network初始化赋值为n，是为了之后从store从获取network，从store中获取的network是最新的版本
+	ep.network = n
+	ep.locator = n.getController().clusterHostID()
+	ep.network, err = ep.getNetworkFromStore()     //根据n，从store中获取最新的network
+	n = ep.network
+	//处理endpoint的option,这里的option都是一些函数(type EndpointOption func(ep *endpoint))，也就是使用option这个函数来处理endpoint
+	ep.processOptions(options...)
+	//遍历endpoint.iface.llAddrs,是[]*net.IPNet类型，returns the list of link-local (IPv4/IPv6) addresses assigned to the endpoint.返回的是endpoint的ip地址
+	for _, llIPNet := range ep.Iface().LinkLocalAddresses() {
+		//判断是否时链路本地单播地址
+		if !llIPNet.IP.IsLinkLocalUnicast() {
+			return nil, types.BadRequestErrorf("invalid link local IP address: %v", llIPNet.IP)
+		}
+	}
+	/*
+	netlabel.MacAddress=="com.docker.network.endpoint.macaddress",而generic为map[string]interface{},所以这里opt是个interface{},空interface（参考http://www.jb51.net/article/56812.htm），所以这个opt是任意类型,所以map存的是key为string类型，value为任意类型。这个这里的作用是，取出generic这个map的"com.docker.network.endpoint.macaddress"mac,判断mac是不是net.HardwareAddr类型的，如果是，那就将mac赋值给endpoint
+	*/
+	if opt, ok := ep.generic[netlabel.MacAddress]; ok {
+		if mac, ok := opt.(net.HardwareAddr); ok {
+			ep.iface.mac = mac
+		}
+	}
+	//获得ipamapi.Ipam和ipamapi.Capability，Ipam是一接口，目的是可以插入/修改IPAM的数据库；Capability代表的是IPAM driver的requirements和capabilities
+	ipam, cap, err := n.getController().getIPAMDriver(n.ipamType)
+	//如果需要mac地址
+	if cap.RequiresMACAddress {
+		if ep.iface.mac == nil {
+			//随机生成一个mac地址
+			ep.iface.mac = netutils.GenerateRandomMAC()
+		}
+		if ep.ipamOptions == nil {
+			ep.ipamOptions = make(map[string]string)
+		}
+		//将新生成的mac地址存入endpoint的ipamOptions数组中
+		ep.ipamOptions[netlabel.MacAddress] = ep.iface.mac.String()
+	}
+	给endpoint分配ipv4和ipv6地址
+	if err = ep.assignAddress(ipam, true, n.enableIPv6 && !n.postIPv6); err != nil {
+		return nil, err
+	}
+	//向network中加入endpoint，在3.3.5.2中继续分析
+	if err = n.addEndpoint(ep); err != nil {
+		return nil, err
+	}
+	//？？再分配一次地址，不知道为什么要两次
+	if err = ep.assignAddress(ipam, false, n.enableIPv6 && n.postIPv6); err != nil {
+		return nil, err
+	}
+	//将该network的endpoint信息存入controller的store中
+	if err = n.getController().updateToStore(ep); err != nil {
+		return nil, err
+	}
+	// Watch for service records
+	n.getController().watchSvcRecord(ep)
+	// Increment endpoint count to indicate completion of endpoint addition
+	if err = n.getEpCnt().IncEndpointCnt(); err != nil {
+		return nil, err
+	}
+	return ep, nil
 }
 ```
 
+#### 3.3.5.2 n.addEndpoint(ep)
+
+`n.addEndpoint(ep)`的实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L874#L887](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L874#L887)，主要代码为：
+
+```go
+func (n *network) addEndpoint(ep *endpoint) error {
+
+}
+```
 
 
 
