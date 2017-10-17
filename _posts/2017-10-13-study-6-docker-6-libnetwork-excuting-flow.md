@@ -706,10 +706,103 @@ func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo,
 	endpoint := &bridgeEndpoint{id: eid, nid: nid, config: epConfig}
 	n.endpoints[eid] = endpoint
 	n.Unlock()
+	// Generate a name for what will be the host side pipe interface
+	//生成在host端的pipe的名字
+	hostIfName, err := netutils.GenerateIfaceName(d.nlh, vethPrefix, vethLen)
+	// Generate a name for what will be the sandbox side pipe interface
+	//生成在sandbox端的pipe的名字
+	containerIfName, err := netutils.GenerateIfaceName(d.nlh, vethPrefix, vethLen)
+	// Generate and add the interface pipe host <-> sandbox
+	//生成veth pair
+	veth := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{Name: hostIfName, TxQLen: 0},
+		PeerName:  containerIfName}
+	//添加veth pair
+	/*
+	LinkAdd adds a new link device. The type and features of the device are taken fromt the parameters in the link object. Equivalent to: `ip link add $link`
+	*/
+	if err = d.nlh.LinkAdd(veth); err != nil {
+		return types.InternalErrorf("failed to add the host (%s) <=> sandbox (%s) pair interfaces: %v", hostIfName, containerIfName, err)
+	}
+	// Get the host side pipe interface handler
+	host, err := d.nlh.LinkByName(hostIfName)
+	// Get the sandbox side pipe interface handler
+	sbox, err := d.nlh.LinkByName(containerIfName)
+	//获得bridgeNetwork的配置
+	n.Lock()
+	config := n.config
+	n.Unlock()
+	// Add bridge inherited attributes to pipe interfaces
+	if config.Mtu != 0 {
+		//设置host端veth的MTU
+		err = d.nlh.LinkSetMTU(host, config.Mtu)
+		//设置sandbox端vethpair的MTU
+		err = d.nlh.LinkSetMTU(sbox, config.Mtu)
+	}
+	// Attach host side pipe interface into the bridge，之后分析
+	if err = addToBridge(d.nlh, hostIfName, config.BridgeName); 
+	//UserlandProxy,每增加一个端口映射，就会增加一个docker-proxy进程，实现宿主机上0.0.0.0地址上对容器的访问代理。
+	//参考http://www.dataguru.cn/thread-544489-1-1.html
+	//这里是对不开启UserlandProxy的情况做处理
+	if !dconfig.EnableUserlandProxy {
+		/*
+			什么是Hairpin？参考http://www.bubuko.com/infodetail-1994270.html
+			 这是一个网络虚拟化技术中常提到的概念，也即交换机端口的VEPA模式。这种技术借助物理交换机解决了虚拟机间流量转发问题。很显然，这种情况下，源和目标都在一个方向，所以就是从哪里进从哪里出的模式。
+		*/
+		err = setHairpinMode(d.nlh, host, true)
+		if err != nil {
+			return err
+		}
+	}
+	// Store the sandbox side pipe interface parameters
+	endpoint.srcName = containerIfName
+	endpoint.macAddress = ifInfo.MacAddress()
+	endpoint.addr = ifInfo.Address()
+	endpoint.addrv6 = ifInfo.AddressIPv6()
+	// Set the sbox's MAC if not provided. If specified, use the one configured by user, otherwise generate one based on IP.
+	if endpoint.macAddress == nil {
+		endpoint.macAddress = electMacAddress(epConfig, endpoint.addr.IP)
+		if err = ifInfo.SetMacAddress(endpoint.macAddress)
+	// Up the host interface after finishing all netlink configuration
+	if err = d.nlh.LinkSetUp(host);
+	//对启用了ipv6的情况进行处理
+	if endpoint.addrv6 == nil && config.EnableIPv6 {
+		var ip6 net.IP
+		network := n.bridge.bridgeIPv6
+		if config.AddressIPv6 != nil {
+			network = config.AddressIPv6
+		}
 
+		ones, _ := network.Mask.Size()
+		if ones > 80 {
+			err = types.ForbiddenErrorf("Cannot self generate an IPv6 address on network %v: At least 48 host bits are needed.", network)
+			return err
+		}
+		//生成ipv6地址
+		ip6 = make(net.IP, len(network.IP))
+		copy(ip6, network.IP)
+		for i, h := range endpoint.macAddress {
+			ip6[i+10] = h
+		}
+
+		endpoint.addrv6 = &net.IPNet{IP: ip6, Mask: network.Mask}
+		if err = ifInfo.SetIPAddress(endpoint.addrv6); err != nil {
+			return err
+		}
+	}
+	//endpoint信息更新到store中
+	if err = d.storeUpdate(endpoint);
+	return nil
 }	
 ```
 
+这里再看看`addToBridge(d.nlh, hostIfName, config.BridgeName)`，实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L848#L869](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L848#L869)，主要代码为：
+
+```go
+func addToBridge(nlh *netlink.Handle, ifaceName, bridgeName string) error {
+	
+}
+```
 
 
 
@@ -723,3 +816,5 @@ func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo,
 ## 参考
 
 * *[Docker 网络部分执行流分析（libnetwork源码解读）](http://blog.csdn.net/gao514916467/article/details/51242299)*
+* *[从docker daemon的角度，添加了userland-proxy的起停开关](http://www.dataguru.cn/thread-544489-1-1.html)*
+* *[Linux Bridge的IP NAT细节探析-填补又一坑的过程](http://www.bubuko.com/infodetail-1994270.html)*
