@@ -872,12 +872,136 @@ func (h *Handle) LinkSetMasterByIndex(link Link, masterIndex int) error {
 }
 ```
 
-目前就先看到这里，再接下去的地方好些太底层了，有些看不懂。
+目前就先看到这里，再接下去的地方好些太底层了。
 
-#### 3.3.6
+#### 3.3.6 ep.Join(sb, joinOptions...)
 
+接着是`ep.Join(sb, joinOptions...)`，该函数的实现位于[moby/vendor/github.com/docker/libnetwork/endpoint.go#L414#L428](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/endpoint.go#L414#L428)，主要代码为：
 
+```go
+func (ep *endpoint) Join(sbox Sandbox, options ...EndpointOption) error {
+	//将Sandbox一般类型转为sandbox类型，参考http://www.jb51.net/article/119585.htm-类型断言
+	sb, ok := sbox.(*sandbox)
+	//joinLeaveStart waits to ensure there are no joins or leaves in progress and  marks this join/leave in progress without race
+	//确保sandbox没有竞争
+	sb.joinLeaveStart()
+	defer sb.joinLeaveEnd()
+	//下面继续分析
+	return ep.sbJoin(sb, options...)
+}
+```
 
+这里来到`ep.sbJoin(sb, options...)`的实现，位于[moby/vendor/github.com/docker/libnetwork/endpoint.go#L430#L580](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/endpoint.go#L430#L580)，主要代码为：
+
+接下来分析
+```go
+func (ep *endpoint) sbJoin(sb *sandbox, options ...EndpointOption) (err error) {
+	//从store中获取endpoint对应的network
+	n, err := ep.getNetworkFromStore()
+	//从store中获取network对应的endpoint
+	ep, err = n.getEndpointFromStore(ep.ID())
+	//给endpoint赋值一些基本信息
+	ep.Lock()
+	if ep.sandboxID != "" {
+		ep.Unlock()
+		return types.ForbiddenErrorf("another container is attached to the same network endpoint")
+	}
+	ep.network = n
+	ep.sandboxID = sb.ID()
+	ep.joinInfo = &endpointJoinInfo{}
+	epid := ep.id
+	ep.Unlock()
+	//network ID
+	nid := n.ID()
+	//执行endpoint的options里的一系列函数
+	ep.processOptions(options...)
+	//获取网络驱动
+	d, err := n.driver(true)
+	//调用网络驱动的Join函数，endpoint加入到sandbox中，将在3.3.6.1中分析
+	err = d.Join(nid, epid, sb.Key(), ep, sb.Labels())
+	// Watch for service records
+	if !n.getController().isAgent() {
+		n.getController().watchSvcRecord(ep)
+	}
+	// 如果!n.ingress && n.Name() != libnGWNetwork，则进入if
+	if doUpdateHostsFile(n, sb) {
+		address := ""
+		if ip := ep.getFirstInterfaceAddress(); ip != nil {
+			address = ip.String()
+		}
+		if err = sb.updateHostsFile(address); err != nil {
+			return err
+		}
+	}
+	//更新DNS
+	if err = sb.updateDNS(n.enableIPv6); err != nil {
+		return err
+	}
+	// Current endpoint providing external connectivity for the sandbox
+	// Returns the endpoint which is providing external connectivity to the sandbox
+	extEp := sb.getGatewayEndpoint()
+	
+	sb.Lock()
+	//将endpoint压入sandbox的endpoints heap中
+	heap.Push(&sb.endpoints, ep)
+	sb.Unlock()
+	//Sandbox每次通过一个Endpoint去Join一个Network都会去发布一把这个ep，参考http://www.jianshu.com/p/4433f4c70cf0
+	sb.populateNetworkResources(ep)
+	//将endpoint信息更新到store中
+	n.getController().updateToStore(ep)
+	//将driver信息添加到Cluster中
+	ep.addDriverInfoToCluster()
+	/*
+	needDefaultGW():Evaluate whether the sandbox requires a default gateway based on the endpoints to which it is connected. It does not account for the default gateway network endpoint.
+	getEndpointInGWNetwork():如果GWNetwork为空
+	*/
+	if sb.needDefaultGW() && sb.getEndpointInGWNetwork() == nil {
+		/*
+  		  libnetwork creates a bridge network "docker_gw_bridge" for providing
+ 		  default gateway for the containers if none of the container's endpoints
+ 		  have GW set by the driver. ICC is set to false for the GW_bridge network.
+
+  		  If a driver can't provide external connectivity it can choose to not set
+   		  the GW IP for the endpoint.
+
+  		 endpoint on the GW_bridge network is managed dynamically by libnetwork.
+   		 ie:
+   			- its created when an endpoint without GW joins the container
+   			- its deleted when an endpoint with GW joins the container
+		*/
+		return sb.setupDefaultGW()
+	}
+	//如果GatewayEndpoint改变了
+	moveExtConn := sb.getGatewayEndpoint() != extEp
+	if moveExtConn {
+		if extEp != nil {
+			//撤销外部连接endpoint
+			logrus.Debugf("Revoking external connectivity on endpoint %s (%s)", extEp.Name(), extEp.ID())
+			//获得extEp对应的network
+			extN, err := extEp.getNetworkFromStore()
+			//获得expEp对应network对应的driver
+			extD, err := extN.driver(true)
+			//撤销endpoint的外部连接
+			extD.RevokeExternalConnectivity(extEp.network.ID(), extEp.ID())
+		}
+		//network不是内部的	
+		if !n.internal {
+			logrus.Debugf("Programming external connectivity on endpoint %s (%s)", ep.Name(), ep.ID())
+			d.ProgramExternalConnectivity(n.ID(), ep.ID(), sb.Labels())
+		}
+	}
+	//sandbox不需要默认Gateway
+	if !sb.needDefaultGW(){
+		// If present, detach and remove the endpoint connecting the sandbox to the default gw network.
+		sb.clearDefaultGW()
+	}
+	return nil
+}
+```
+
+##### 3.3.6.1 d.Join()
+
+`d.Join(nid, epid, sb.Key(), ep, sb.Labels())`的实现位于
 
 ## 结语
 
@@ -888,3 +1012,5 @@ func (h *Handle) LinkSetMasterByIndex(link Link, masterIndex int) error {
 * *[Docker 网络部分执行流分析（libnetwork源码解读）](http://blog.csdn.net/gao514916467/article/details/51242299)*
 * *[从docker daemon的角度，添加了userland-proxy的起停开关](http://www.dataguru.cn/thread-544489-1-1.html)*
 * *[Linux Bridge的IP NAT细节探析-填补又一坑的过程](http://www.bubuko.com/infodetail-1994270.html)*
+* *[浅谈Go语言中的结构体struct & 接口Interface & 反射](http://www.jb51.net/article/119585.htm)*
+* *[Docker Embedded DNS](http://www.jianshu.com/p/4433f4c70cf0)*
