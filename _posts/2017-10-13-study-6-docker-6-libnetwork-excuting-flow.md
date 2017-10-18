@@ -226,7 +226,12 @@ func (daemon *Daemon) connectToNetwork(container *container.Container, idOrName 
 
 ### 3.3.3 network---findAndAttachNetwork()
 
-接下来再分析daemon.findAndAttachNetwork(),该函数位于[moby/daemon/container_operations.go#L341#L421](https://github.com/moby/moby/blob/17.05.x/daemon/container_operations.go#L341#L421)，对于这部分的代码，分析如下：
+接下来再分析daemon.findAndAttachNetwork()。
+
+流程图如下：
+![](/img/study/study-6-docker-6-libnetwork-excuting-flow/libnetwork-excute-flow-container-start-findAndAttachNetwork.png)
+
+该函数位于[moby/daemon/container_operations.go#L341#L421](https://github.com/moby/moby/blob/17.05.x/daemon/container_operations.go#L341#L421)，对于这部分的代码，分析如下：
 
 ```go
 func (daemon *Daemon) findAndAttachNetwork(container *container.Container, idOrName string, epConfig *networktypes.EndpointSettings) (libnetwork.Network, *networktypes.NetworkingConfig, error) {
@@ -424,10 +429,6 @@ func (c *controller) getNetworksFromStore() ([]*network, error) {
 
 最后从controller的stores中获得了network。
 
-流程图如下：
-
-![](/img/study/study-6-docker-6-libnetwork-excuting-flow/libnetwork-excute-flow-container-start-findAndAttachNetwork.png)
-
 ### 3.3.4 sandbox---getNetworkSandbox()、NewSandbox()
 
 #### 3.3.4.1 getNetworkSandbox()
@@ -561,7 +562,13 @@ func (c *controller) NewSandbox(containerID string, options ...SandboxOption) (s
 
 ### 3.3.5 endpoint---n.CreateEndpoint()
 
-`n.CreateEndpoint()`实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L889#L990](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L889#L990)，主要代码为：
+`n.CreateEndpoint()`实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L889#L990](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L889#L990)。
+
+分析流程如图：
+
+![](/img/study/study-6-docker-6-libnetwork-excuting-flow/libnetwork-excute-flow-container-start-CreateEndpoint.png)
+
+主要代码为：
 
 ```go
 func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoint, error) {
