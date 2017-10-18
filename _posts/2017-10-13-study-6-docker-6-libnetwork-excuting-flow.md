@@ -1001,7 +1001,7 @@ func (ep *endpoint) sbJoin(sb *sandbox, options ...EndpointOption) (err error) {
 
 ##### 3.3.6.1 d.Join()
 
-`d.Join(nid, epid, sb.Key(), ep, sb.Labels())`分析bridge驱动下的实现，位于[moby/vendor/github.com/docker/libnetwork/endpoint.go#L430#L580](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/endpoint.go#L430#L580)，主要代码为：
+`d.Join(nid, epid, sb.Key(), ep, sb.Labels())`分析bridge驱动下的实现，位于[moby/vendor/github.com/docker/libnetwork/drivers//bridge/bridge.go#L1204#L1247](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers//bridge/bridge.go#L1204#L1247)，主要代码为：
 
 ```go
 ```
