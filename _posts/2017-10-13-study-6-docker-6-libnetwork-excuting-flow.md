@@ -63,6 +63,8 @@ tags:
 
 ### 3.2 流程图
 
+![](/img/study/study-6-docker-6-libnetwork-excuting-flow/libnetwork-excute-flow-container-start.png)
+
 ### 3.3 代码分析
 
 #### 3.3.1 allocateNetwork()
@@ -200,6 +202,8 @@ func (daemon *Daemon) connectToNetwork(container *container.Container, idOrName 
 	}
 	//根据network创建endpoint join的配置信息
 	joinOptions, err := container.BuildJoinOptions(n)
+	//将endpoint加入sandbox中，将在3.3.6分析
+	ep.Join(sb, joinOptions...)
 	//start中传入的managed为false
 	if !container.Managed {
 		// add container name/alias to DNS
