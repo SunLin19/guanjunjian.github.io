@@ -800,9 +800,68 @@ func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo,
 
 ```go
 func addToBridge(nlh *netlink.Handle, ifaceName, bridgeName string) error {
-	
+	//finds a link by name and returns a pointer to the object.
+	//获得host端veth
+	link, err := nlh.LinkByName(ifaceName)
+	// LinkSetMaster sets the master of the link device.
+	// Equivalent to: `ip link set $link master $master`
+	下面详细再看看
+	nlh.LinkSetMaster(link,&netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: bridgeName}})
+	return nil
 }
 ```
+
+接着到`nlh.LinkSetMaster(link,&netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: bridgeName}})`的调用，它的实现位于[moby/vendor/github.com/vishvananda/netlink/link_linux.go#L380#L391](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/vishvananda/netlink/link_linux.go#L380#L391)，主要代码为：
+
+```go
+func (h *Handle) LinkSetMaster(link Link, master *Bridge) error {
+	index := 0
+	if master != nil {
+		//返回一个LinkAttrs结构体，LinkAttrs represents data shared by most link types，这个结构体包含了MTU、TxQLen等一些属性
+		masterBase := master.Attrs()
+		//获取正确的link index
+		h.ensureIndex(masterBase)
+		index = masterBase.Index
+	}
+	if index <= 0 {
+		return fmt.Errorf("Device does not exist")
+	}
+	// LinkSetMasterByIndex sets the master of the link device.
+	// Equivalent to: `ip link set $link master $master`
+	//根据index设置，下面再详细看
+	return h.LinkSetMasterByIndex(link, index)
+}
+```
+
+接着到`h.LinkSetMasterByIndex(link, index)`的调用，它的实现位于[moby/vendor/github.com/vishvananda/netlink/link_linux.go#L413#L430](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/vishvananda/netlink/link_linux.go#L413#L430)，主要代码为：
+
+```go
+func (h *Handle) LinkSetMasterByIndex(link Link, masterIndex int) error {
+	//这里的link是./vishvananda/netlink/link.go中的link，返回的也是一个LinkAttrs结构体，这里返回的是host的veth的
+	base := link.Attrs()
+	h.ensureIndex(base)
+	//生成一个NetlinkRequest结构体
+	req := h.newNetlinkRequest(syscall.RTM_SETLINK, syscall.NLM_F_ACK)
+	// Create an IfInfomsg with family specified
+	msg := nl.NewIfInfomsg(syscall.AF_UNSPEC)
+	msg.Index = int32(base.Index)
+	//req添加Data
+	req.AddData(msg)
+
+	b := make([]byte, 4)
+	native.PutUint32(b, uint32(masterIndex))
+	// Create a new Extended RtAttr object
+	data := nl.NewRtAttr(syscall.IFLA_MASTER, b)
+	req.AddData(data)
+	// Execute the request against a the given sockType.
+	// Returns a list of netlink messages in serialized format, optionally filtered by resType.
+	//通过给定的信息执行NetlinkRequest
+	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
+	return err
+}
+```
+
+目前就先看到这里，再接下去的地方好些太底层了，有些看不懂。
 
 
 
