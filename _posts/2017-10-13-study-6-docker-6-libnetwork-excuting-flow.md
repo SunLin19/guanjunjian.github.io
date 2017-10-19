@@ -876,7 +876,11 @@ func (h *Handle) LinkSetMasterByIndex(link Link, masterIndex int) error {
 
 #### 3.3.6 ep.Join(sb, joinOptions...)
 
-接着是`ep.Join(sb, joinOptions...)`，该函数的实现位于[moby/vendor/github.com/docker/libnetwork/endpoint.go#L414#L428](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/endpoint.go#L414#L428)，主要代码为：
+接着是`ep.Join(sb, joinOptions...)`，分析流程如图：
+
+![](/img/study/study-6-docker-6-libnetwork-excuting-flow/libnetwork-excute-flow-container-start-Join.png)
+
+该函数的实现位于[moby/vendor/github.com/docker/libnetwork/endpoint.go#L414#L428](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/endpoint.go#L414#L428)，主要代码为：
 
 ```go
 func (ep *endpoint) Join(sbox Sandbox, options ...EndpointOption) error {
