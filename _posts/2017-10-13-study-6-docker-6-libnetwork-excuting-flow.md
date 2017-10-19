@@ -13,7 +13,7 @@ tags:
 * content
 {:toc}
 
-> 上一篇分析了daemon对于start的处理，之前的文章是对整个容器启动过程的简要分析，这篇打算libnetwork的执行流程。
+> 上一篇分析了daemon对于start的处理，之前的文章是对整个容器启动过程的简要分析，这篇分析libnetwork的执行流程。
 >  
 > 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
