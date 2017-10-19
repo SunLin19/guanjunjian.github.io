@@ -1004,6 +1004,29 @@ func (ep *endpoint) sbJoin(sb *sandbox, options ...EndpointOption) (err error) {
 `d.Join(nid, epid, sb.Key(), ep, sb.Labels())`分析bridge驱动下的实现，位于[moby/vendor/github.com/docker/libnetwork/drivers//bridge/bridge.go#L1204#L1247](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers//bridge/bridge.go#L1204#L1247)，主要代码为：
 
 ```go
+func (d *driver) Join(nid, eid string, sboxKey string, jinfo driverapi.JoinInfo, options map[string]interface{}) error {
+	// InitOSContext initializes OS context while configuring network resources
+	defer osl.InitOSContext()()
+	network, err := d.getNetwork(nid)
+	endpoint, err := network.getEndpoint(eid)
+	//从options中获得containerConfig
+	endpoint.containerConfig, err = parseContainerOptions(options)
+	// InterfaceName returns an InterfaceNameInfo go interface to facilitate setting the names for the interface.
+	// 返回一个InterfaceNameInfo的接口，用于名字的设置,返回的是ep.iface,类型endpointInterface
+	iNames := jinfo.InterfaceName()
+	// defaultContainerVethPrefix = "eth" 
+	containerVethPrefix := defaultContainerVethPrefix
+	if network.config.ContainerIfacePrefix != "" {
+		containerVethPrefix = network.config.ContainerIfacePrefix
+	}
+	//设置endpoint srcName和containerVethPrefix
+	iNames.SetNames(endpoint.srcName, containerVethPrefix)
+	// SetGateway sets the default IPv4 gateway when a container joins the endpoint.
+	err = jinfo.SetGateway(network.bridge.gatewayIPv4)
+	// SetGatewayIPv6 sets the default IPv6 gateway when a container joins the endpoint.
+	err = jinfo.SetGatewayIPv6(network.bridge.gatewayIPv6)
+	return nil
+}
 ```
 
 ## 结语
