@@ -48,6 +48,131 @@ tags:
 
 ![](/img/study/study-6-docker-6-libnetwork-excuting-flow/libnetwork-excute-flow-daemon-init.png)
 
+### 2.3 代码分析
+
+这部分分析从`daemon.netController, err = daemon.initNetworkController(daemon.configStore, activeSandboxes)`开始，`daemon.initNetworkController()`的实现位于[moby/daemon/daemon_unix.go#L727#L774](https://github.com/moby/moby/blob/17.05.x/daemon/daemon_unix.go#L727#L774)，对于这部分的代码，分析如下：
+
+```go
+func (daemon *Daemon) initNetworkController(config *config.Config, activeSandboxes map[string]interface{}) (libnetwork.NetworkController, error) {
+	//network options,如OptionExecRoot、OptionDefaultDriver、OptionDefaultNetwork等
+	netOptions, err := daemon.networkOptions(config, daemon.PluginStore, activeSandboxes)
+	//根据netOptions创建net controller，2.3.1分析
+	controller, err := libnetwork.New(netOptions...)
+	// Initialize default network on "null"
+	if n, _ := controller.NetworkByName("none"); n == nil {
+		//如果没有就新建一个，NewNetwork()在2.3.2分析
+		if _, err := controller.NewNetwork("null", "none", "", libnetwork.NetworkOptionPersist(true)); err != nil {
+			return nil, fmt.Errorf("Error creating default \"null\" network: %v", err)
+		}
+	}
+	// Initialize default network on "host"
+	if n, _ := controller.NetworkByName("host"); n == nil {
+		if _, err := controller.NewNetwork("host", "host", "", libnetwork.NetworkOptionPersist(true)); err != nil {
+			return nil, fmt.Errorf("Error creating default \"host\" network: %v", err)
+		}
+	}
+	// Clear stale bridge network
+	if n, err := controller.NetworkByName("bridge"); err == nil {
+		if err = n.Delete(); err != nil {
+			return nil, fmt.Errorf("could not delete the default bridge network: %v", err)
+		}
+	}
+	if !config.DisableBridge {
+		// Initialize default driver "bridge"，在2.3.3分析
+		if err := initBridgeDriver(controller, config); err != nil {
+			return nil, err
+		}
+	} else {
+		removeDefaultBridgeInterface()
+	}
+	return controller, nil
+}
+```
+
+#### 2.3.1 libnetwork.New()
+
+`libnetwork.New(netOptions...)`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L179#L244](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L179#L244)，对于这部分的代码，分析如下：
+
+```go
+func New(cfgOptions ...config.Option) (NetworkController, error) {
+	c := &controller{
+		id:              stringid.GenerateRandomID(),
+		cfg:             config.ParseConfigOptions(cfgOptions...),
+		sandboxes:       sandboxTable{},
+		svcRecords:      make(map[string]svcInfo),
+		serviceBindings: make(map[serviceKey]*service),
+		agentInitDone:   make(chan struct{}),
+		networkLocker:   locker.New(),
+	}
+	c.initStores()
+	//DrvRegistry holds the registry of all network drivers and IPAM drivers that it knows about.
+	drvRegistry, err := drvregistry.New(c.getStore(datastore.LocalScope), c.getStore(datastore.GlobalScope), c.RegisterDriver, nil, c.cfg.PluginGetter)
+	/*the daemon are enabled for the experimental features，这是一个bool变量，true的话会增加额外的驱动初始化结构体，如ipvlan
+	这个函数调用的是./libnetwork/drivers_linux.go，返回的是bridge、host、macvlan、null、remote、overlay的初始化结构体initializer数组，这个结构体包含了驱动的初始化函数和驱动的名字,以bridge驱动为例：{bridge.Init, "bridge"}
+	在2.3.1.1中分析bridge的初始化过程
+	*/
+	for _, i := range getInitializers(c.cfg.Daemon.Experimental) {
+		var dcfg map[string]interface{}
+
+		// External plugins don't need config passed through daemon. They can
+		// bootstrap themselves
+		//如果不是remote驱动，则创建driver config
+		if i.ntype != "remote" {
+			dcfg = c.makeDriverConfig(i.ntype)
+		}
+		//将这些驱动的名字、初始化函数、config添加到drvRegistry中
+		if err := drvRegistry.AddDriver(i.ntype, i.fn, dcfg); err != nil {
+			return nil, err
+		}
+	}
+	//初始化IPAMDrivers
+	initIPAMDrivers(drvRegistry, nil, c.getStore(datastore.GlobalScope))
+	//赋值controller的drvRegistry
+	c.drvRegistry = drvRegistry
+
+	if c.cfg != nil && c.cfg.Cluster.Watcher != nil {
+		if err := c.initDiscovery(c.cfg.Cluster.Watcher); err != nil {
+			// Failing to initialize discovery is a bad situation to be in.
+			// But it cannot fail creating the Controller
+			logrus.Errorf("Failed to Initialize Discovery : %v", err)
+		}
+	}
+	//遍历controller所有network，如果network has special drivers, which do not need to perform any network plumbing,将添加到controller中
+	c.WalkNetworks(populateSpecial)
+	/*
+	Reserve pools first before doing cleanup. Otherwise the cleanups of endpoint/network and sandbox below will generate many unnecessary warnings
+	*/
+	c.reservePools()
+	// Cleanup resources
+	c.sandboxCleanup(c.cfg.ActiveSandboxes)
+	c.cleanupLocalEndpoints()
+	c.networkCleanup()
+	//
+	c.startExternalKeyListener()
+	return c, nil
+}
+```
+
+##### 2.3.1.1 bridge驱动的初始化
+
+##### 2.3.1.2 c.startExternalKeyListener()
+
+`c.startExternalKeyListener()`实现位于[moby/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124)，对于这部分的代码，分析如下：
+
+```go
+func (c *controller) startExternalKeyListener() error {
+	//udsBase = "/run/docker/libnetwork/"，这里创建"/run/docker/libnetwork/"目录，访问权限0600
+	os.MkdirAll(udsBase, 0600)
+}
+```
+
+
+#### 2.3.2 controller.NewNetwork()
+
+#### 2.3.3 initBridgeDriver()
+
+
+
 ## 3. libnetwork在docker创建时的工作
 
 ### 3.1 libnetwork的工作
