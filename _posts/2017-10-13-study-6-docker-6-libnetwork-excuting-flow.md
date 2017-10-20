@@ -147,13 +147,62 @@ func New(cfgOptions ...config.Option) (NetworkController, error) {
 	c.sandboxCleanup(c.cfg.ActiveSandboxes)
 	c.cleanupLocalEndpoints()
 	c.networkCleanup()
-	//
+	// /run/docker/libnetwork/container ID.sock开始监听
 	c.startExternalKeyListener()
 	return c, nil
 }
 ```
 
 ##### 2.3.1.1 bridge驱动的初始化
+
+从`for _, i := range getInitializers(c.cfg.Daemon.Experimental)`中有`{bridge.Init, "bridge"}`，因此bridge驱动的初始化函数为bridge.Init()，它的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L149#L159](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L149#L159)，代码分析如下：
+
+```go
+func Init(dc driverapi.DriverCallback, config map[string]interface{}) error {
+	//在下面详细看
+	d := newDriver()
+	if err := d.configure(config); err != nil {
+		return err
+	}
+	// Capability represents the high level capabilities of the drivers which libnetwork can make use of
+	c := driverapi.Capability{
+		DataScope: datastore.LocalScope,
+	}
+	//RegisterDriver provides a way for Remote drivers to dynamically register new NetworkType and associate with a driver instance
+	return dc.RegisterDriver(networkType, d, c)
+}
+```
+
+接着看看`newDriver()`，它的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L144#L146](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L144#L146)，代码分析如下：
+
+```go
+func newDriver() *driver {
+	//返回一个driver结构体
+	return &driver{networks: map[string]*bridgeNetwork{}, config: &configuration{}}
+}
+```
+
+再继续看看driver结构体
+
+```go
+type driver struct {
+	// configuration info for the "bridge" driver.
+	config         *configuration
+	network        *bridgeNetwork
+	// ChainInfo defines the iptables chain.
+	natChain       *iptables.ChainInfo
+	filterChain    *iptables.ChainInfo
+	isolationChain *iptables.ChainInfo
+	networks       map[string]*bridgeNetwork
+	store          datastore.DataStore
+	/*
+	Handle is an handle for the netlink requests on a specific network namespace. All the requests on the same netlink family share the same netlink socket,which gets released when the handle is deleted.
+	*/
+	nlh            *netlink.Handle
+	sync.Mutex
+}
+```
+
 
 ##### 2.3.1.2 c.startExternalKeyListener()
 
@@ -163,6 +212,17 @@ func New(cfgOptions ...config.Option) (NetworkController, error) {
 func (c *controller) startExternalKeyListener() error {
 	//udsBase = "/run/docker/libnetwork/"，这里创建"/run/docker/libnetwork/"目录，访问权限0600
 	os.MkdirAll(udsBase, 0600)
+	//uds="/run/docker/libnetwork/"+c.id+".sock"
+	uds := udsBase + c.id + ".sock"
+	//监听这个sock
+	l, err := net.Listen("unix", uds)
+	os.Chmod(uds, 0600)
+	c.Lock()
+	c.extKeyListener = l
+	c.Unlock()
+	//新起一个routine，接收客户端连接
+	go c.acceptClientConnections(uds, l)
+	return nil
 }
 ```
 
