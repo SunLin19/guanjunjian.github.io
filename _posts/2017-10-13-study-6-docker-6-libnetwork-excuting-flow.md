@@ -206,7 +206,7 @@ type driver struct {
 
 ##### 2.3.1.2 c.startExternalKeyListener()
 
-`c.startExternalKeyListener()`实现位于[moby/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124)，对于这部分的代码，分析如下：
+`c.startExternalKeyListener()`实现位于[moby/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124)。这部分代码的作用是由controller创建一个network。对于这部分的代码，分析如下：
 
 ```go
 func (c *controller) startExternalKeyListener() error {
@@ -228,6 +228,142 @@ func (c *controller) startExternalKeyListener() error {
 
 
 #### 2.3.2 controller.NewNetwork()
+
+`controller.NewNetwork()`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L665#L773](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L665#L773)。以
+
+```go
+controller.NewNetwork("bridge", "bridge", "",
+		libnetwork.NetworkOptionEnableIPv6(config.BridgeConfig.EnableIPv6),
+		libnetwork.NetworkOptionDriverOpts(netOption),
+		libnetwork.NetworkOptionIpam("default", "", v4Conf, v6Conf, nil),
+		libnetwork.NetworkOptionDeferIPv6Alloc(deferIPv6Alloc))
+```
+
+为例，代码分析如下：
+
+```go
+func (c *controller) NewNetwork(networkType, name string, id string, options ...NetworkOption) (Network, error) {
+	//对于例子中，id=="",这里是查看对应id的network是否存在，如果存在则返回错误
+	if id != "" {
+		c.networkLocker.Lock(id)
+		defer c.networkLocker.Unlock(id)
+
+		if _, err := c.NetworkByID(id); err == nil {
+			return nil, NetworkNameError(id)
+		}
+	}
+	//检验network name
+	if !config.IsValidName(name) {
+		return nil, ErrInvalidName(name)
+	}
+	随机生成一个network id
+	if id == "" {
+		id = stringid.GenerateRandomID()
+	}
+	// 返回的是 "default"，是default ipam driver的名字
+	defaultIpam := defaultIpamForNetworkType(networkType)
+	//创建network结构体
+	network := &network{
+		name:        name,
+		networkType: networkType,
+		generic:     map[string]interface{}{netlabel.GenericData: make(map[string]string)},
+		ipamType:    defaultIpam,
+		id:          id,
+		created:     time.Now(),
+		ctrlr:       c,
+		persist:     true,
+		drvOnce:     &sync.Once{},
+	}
+	//network的options挨个进行调用
+	network.processOptions(options...)
+	//根据网络类型，获得驱动以及驱动的capability，但这里没有取driver
+	_, cap, err := network.resolveDriver(networkType, true)
+	//如果network的ingress为true，cap的DataScope不为"global"
+	if network.ingress && cap.DataScope != datastore.GlobalScope {
+		//返回错误，Ingress network只能是global scope network
+		return nil, types.ForbiddenErrorf("Ingress network can only be global scope network")
+	}
+	// cap的DataScope为"global"，controller是manager和agent，network的dynamic为false
+	if cap.DataScope == datastore.GlobalScope && !c.isDistributedControl() && !network.dynamic {
+		if c.isManager() {
+			// For non-distributed controlled environment, globalscoped non-dynamic networks are redirected to Manager
+			return nil, ManagerRedirectError(name)
+		}
+		//不能在worker节点创建multi-host网络
+		return nil, types.ForbiddenErrorf("Cannot create a multi-host network from a worker node. Please create the network from a manager node.")
+	}
+	//在分配各种资源前，确保这种类型的网络驱动是可用的
+	if _, err := network.driver(true); err != nil {
+		return nil, err
+	}
+	//分配ipam
+	network.ipamAllocate()
+	//创建network，2.3.2.1继续分析
+	c.addNetwork(network)
+	/*
+	First store the endpoint count, then the network.
+	To avoid to end up with a datastore containing a network and not an epCnt,in case of an ungraceful shutdown during this function call.
+	*/
+	epCnt := &endpointCnt{n: network}
+	if err = c.updateToStore(epCnt); err != nil {
+		return nil, err
+	}
+	//network的endpoint count
+	network.epCnt = epCnt
+	//将network更新存储到store中
+	c.updateToStore(network)
+	//join network into agent cluster
+	joinCluster(network)
+	if !c.isDistributedControl() {
+		c.Lock()
+		/*
+		In the filter table FORWARD chain first rule should be to jump to INGRESS-CHAIN.
+		This chain has the rules to allow access to the published ports for swarm tasks from local bridge networks and docker_gwbridge (ie:taks on other swarm netwroks)
+		*/
+		arrangeIngressFilterRule()
+		c.Unlock()
+	}
+	return network, nil
+}
+```
+
+##### 2.3.2.1 c.addNetwork(network)
+
+`c.addNetwork(network)`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L580#L864](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L580#L864)，分析如下:
+
+```go
+func (c *controller) addNetwork(n *network) error {
+	//获得对应network的driver，如果不存在则载入
+	d, err := n.driver(true)
+	// Create the network，下面接着分析
+	d.CreateNetwork(n.id, n.generic, n, n.getIPData(4), n.getIPData(6))
+	//在linux中是个空函数，Stub implementations for DNS related functions
+	n.startResolver()
+	return nil
+}
+```
+
+`d.CreateNetwork()`是以bridge driver为例的，所以它的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L586#L614](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L586#L614)，分析如下:
+
+```go
+func (d *driver) CreateNetwork(id string, option map[string]interface{}, nInfo driverapi.NetworkInfo, ipV4Data, ipV6Data []driverapi.IPAMData) error {
+	if len(ipV4Data) == 0 || ipV4Data[0].Pool.String() == "0.0.0.0/0" {
+		return types.BadRequestErrorf("ipv4 pool is empty")
+	}
+	// Sanity checks
+	d.Lock()
+	if _, ok := d.networks[id]; ok {
+		d.Unlock()
+		//这个network id已经存在
+		return types.ForbiddenErrorf("network %s exists", id)
+	}
+	d.Unlock()
+	// Parse and validate the config. It should not be conflict with existing networks' config,config为networkConfiguration类型
+	config, err := parseNetworkOptions(id, option)
+	//还没看，明天看
+	config.processIPAM(id, ipV4Data, ipV6Data)
+}
+```
 
 #### 2.3.3 initBridgeDriver()
 
