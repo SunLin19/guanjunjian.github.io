@@ -147,7 +147,7 @@ func New(cfgOptions ...config.Option) (NetworkController, error) {
 	c.sandboxCleanup(c.cfg.ActiveSandboxes)
 	c.cleanupLocalEndpoints()
 	c.networkCleanup()
-	// /run/docker/libnetwork/container ID.sock开始监听
+	// /run/docker/libnetwork/container ID.sock开始监听，2.3.1.2分析
 	c.startExternalKeyListener()
 	return c, nil
 }
