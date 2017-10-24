@@ -298,7 +298,7 @@ func (c *controller) NewNetwork(networkType, name string, id string, options ...
 	}
 	//分配ipam
 	network.ipamAllocate()
-	//创建network，2.3.2.1继续分析
+	//创建network，下面继续分析
 	c.addNetwork(network)
 	/*
 	First store the endpoint count, then the network.
@@ -327,7 +327,7 @@ func (c *controller) NewNetwork(networkType, name string, id string, options ...
 }
 ```
 
-##### 2.3.2.1 c.addNetwork(network)
+**c.addNetwork(network)**
 
 `c.addNetwork(network)`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L580#L864](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L580#L864)，分析如下:
 
@@ -342,6 +342,8 @@ func (c *controller) addNetwork(n *network) error {
 	return nil
 }
 ```
+
+**d.CreateNetwork()**
 
 `d.CreateNetwork()`是以bridge driver为例的，所以它的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L586#L614](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L586#L614)，分析如下:
 
@@ -360,10 +362,140 @@ func (d *driver) CreateNetwork(id string, option map[string]interface{}, nInfo d
 	d.Unlock()
 	// Parse and validate the config. It should not be conflict with existing networks' config,config为networkConfiguration类型
 	config, err := parseNetworkOptions(id, option)
-	//还没看，明天看
+	//对ip地址的处理
 	config.processIPAM(id, ipV4Data, ipV6Data)
+	//下面接着分析
+	d.createNetwork(config)
+	//更新config到store中
+	return d.storeUpdate(config)
 }
 ```
+
+**d.createNetwork(config)**
+
+`d.createNetwork(config)`的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L616#L770](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L616#L770)，分析如下:
+
+```go
+func (d *driver) createNetwork(config *networkConfiguration) error {
+	//initializes OS context while configuring network resources
+	defer osl.InitOSContext()()
+	//把d.networks转成slice
+	networkList := d.getNetworks()
+	
+	for i, nw := range networkList {
+		nw.Lock()
+		nwConfig := nw.config
+		nw.Unlock()
+		//Conflicts check if two NetworkConfiguration objects overlap,查看新建的network config是否与之前的network冲突
+		if err := nwConfig.Conflicts(config); err != nil {
+			//对于新建network config冲突的处理
+			//如果是使用的defaultBridge
+			if config.DefaultBridge {
+				// We encountered and identified a stale default network
+				// We must delete it as libnetwork is the source of thruth
+				// The default network being created must be the only one
+				// This can happen only from docker 1.12 on ward
+				logrus.Infof("Removing stale default bridge network %s (%s)", nwConfig.ID, nwConfig.BridgeName)
+				if err := d.DeleteNetwork(nwConfig.ID); err != nil {
+					logrus.Warnf("Failed to remove stale default network: %s (%s): %v. Will remove from store.", nwConfig.ID, nwConfig.BridgeName, err)
+					d.storeDelete(nwConfig)
+				}
+				networkList = append(networkList[:i], networkList[i+1:]...)
+			} else {
+				return types.ForbiddenErrorf("cannot create network %s (%s): conflicts with network %s (%s): %s",
+					config.ID, config.BridgeName, nwConfig.ID, nwConfig.BridgeName, err.Error())
+			}
+		}
+	}
+	// Create and set network handler in driver
+	network := &bridgeNetwork{
+		id:         config.ID,
+		endpoints:  make(map[string]*bridgeEndpoint),
+		config:     config,
+		portMapper: portmapper.New(d.config.UserlandProxyPath),
+		driver:     d,
+	}
+	d.Lock()
+	//新建的network存入driver
+	d.networks[config.ID] = network
+	d.Unlock()
+	// Initialize handle when needed
+	d.Lock()
+	if d.nlh == nil {
+		// NlHandle returns the netlink handler,*netlink.Handle
+		d.nlh = ns.NlHandle()
+	}
+	d.Unlock()
+	/*
+	Create or retrieve the bridge L3 interface
+	newInterface creates a new bridge interface structure. It attempts to find an already existing device identified by the configuration BridgeName field, or the default bridge name when unspecified, but doesn't attempt to create one when missing
+	下面接着分析
+	*/
+	bridgeIface, err := newInterface(d.nlh, config)
+	network.bridge = bridgeIface
+	/*
+	Verify the network configuration does not conflict with previously installed networks. This step is needed now because driver might have now set the bridge name on this config struct. And because we need to check for possible address conflicts, so we need to check against operationa lnetworks.
+	*/
+	config.conflictsWithNetworks(config.ID, networkList)
+
+	setupNetworkIsolationRules := func(config *networkConfiguration, i *bridgeInterface) error {
+		/*
+		isolateNetwork():Install/Removes the iptables rules needed to isolate this network from each of the other networks.
+		true是install，false是removes
+		*/
+		if err := network.isolateNetwork(networkList, true); err != nil {
+			if err := network.isolateNetwork(networkList, false); err != nil {
+				logrus.Warnf("Failed on removing the inter-network iptables rules on cleanup: %v", err)
+			}
+			return err
+		}
+		//注册Iptables清理函数
+		network.registerIptCleanFunc(func() error {
+			nwList := d.getNetworks()
+			//清理driver中所有的network的iptables
+			return network.isolateNetwork(nwList, false)
+		})
+		return nil
+	}
+	// Prepare the bridge setup configuration， bridgeSetup结构体
+	bridgeSetup := newBridgeSetup(config, bridgeIface)
+	/*
+	If the bridge interface doesn't exist, we need to start the setup steps by creating a new device and assigning it an IPv4 address.
+	*/
+	bridgeAlreadyExists := bridgeIface.exists()
+	if !bridgeAlreadyExists {
+		// SetupDevice create a new bridge interface，下面接着分析
+		bridgeSetup.queueStep(setupDevice)
+	}
+}
+```
+**d.createNetwork(config)--->newInterface(d.nlh, config)**
+
+`newInterface(d.nlh, config)`的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/interface.go#L31#L48](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/interface.go#L31#L48)，分析如下:
+
+```go
+func newInterface(nlh *netlink.Handle, config *networkConfiguration) (*bridgeInterface, error) {
+	// create interface structure
+	i := &bridgeInterface{nlh: nlh}
+	// Initialize the bridge name to the default if unspecified.
+	if config.BridgeName == "" {
+		config.BridgeName = DefaultBridgeName
+	}
+	// Attempt to find an existing bridge named with the specified name.
+	i.Link, err = nlh.LinkByName(config.BridgeName)
+	if err != nil {
+		logrus.Debugf("Did not find any interface with name %s: %v", config.BridgeName, err)
+	}
+	//将link转为netlink.Bridge类型 
+	else if _, ok := i.Link.(*netlink.Bridge); !ok {
+		return nil, fmt.Errorf("existing interface %s is not a bridge", i.Link.Attrs().Name)
+	}
+	return i, nil
+}
+```
+
+**d.createNetwork(config)--->bridgeSetup.queueStep(setupDevice)**
+
 
 #### 2.3.3 initBridgeDriver()
 
