@@ -464,11 +464,67 @@ func (d *driver) createNetwork(config *networkConfiguration) error {
 	*/
 	bridgeAlreadyExists := bridgeIface.exists()
 	if !bridgeAlreadyExists {
-		// SetupDevice create a new bridge interface，下面接着分析
+		// SetupDevice create a new bridge interface，创建一个link并分配mac地址，下面接着分析
 		bridgeSetup.queueStep(setupDevice)
 	}
+	// Even if a bridge exists try to setup IPv4.给bridge分配ipv4和gateway ipv4地址
+	bridgeSetup.queueStep(setupBridgeIPv4)
+	//是否允许ipv6转发
+	enableIPv6Forwarding := d.config.EnableIPForwarding && config.AddressIPv6 != nil
+	// Conditionally queue setup steps depending on configuration values.
+	//依次将下面的setupstep加入到bridgeSetup.queueStep中
+	for _, step := range []struct {
+		Condition bool
+		Fn        setupStep
+	}{
+		// Enable IPv6 on the bridge if required. We do this even for a
+		// previously  existing bridge, as it may be here from a previous
+		// installation where IPv6 wasn't supported yet and needs to be
+		// assigned an IPv6 link-local address.
+		{config.EnableIPv6, setupBridgeIPv6},
+
+		// We ensure that the bridge has the expectedIPv4 and IPv6 addresses in
+		// the case of a previously existing device.
+		{bridgeAlreadyExists, setupVerifyAndReconcile},
+
+		// Enable IPv6 Forwarding
+		{enableIPv6Forwarding, setupIPv6Forwarding},
+
+		// Setup Loopback Adresses Routing
+		{!d.config.EnableUserlandProxy, setupLoopbackAdressesRouting},
+
+		// Setup IPTables.
+		{d.config.EnableIPTables, network.setupIPTables},
+
+		//We want to track firewalld configuration so that
+		//if it is started/reloaded, the rules can be applied correctly
+		{d.config.EnableIPTables, network.setupFirewalld},
+
+		// Setup DefaultGatewayIPv4
+		{config.DefaultGatewayIPv4 != nil, setupGatewayIPv4},
+
+		// Setup DefaultGatewayIPv6
+		{config.DefaultGatewayIPv6 != nil, setupGatewayIPv6},
+
+		// Add inter-network communication rules.
+		{d.config.EnableIPTables, setupNetworkIsolationRules},
+
+		//Configure bridge networking filtering if ICC is off and IP tables are enabled
+		{!config.EnableICC && d.config.EnableIPTables, setupBridgeNetFiltering},
+	} {
+		if step.Condition {
+			bridgeSetup.queueStep(step.Fn)
+		}
+	}
+	// Apply the prepared list of steps, and abort at the first error. 
+	//SetupDeviceUp ups the given bridge interface.
+	bridgeSetup.queueStep(setupDeviceUp)
+	//允许上面所有的setupsteps
+	bridgeSetup.apply()
+	return nil
 }
 ```
+
 **d.createNetwork(config)--->newInterface(d.nlh, config)**
 
 `newInterface(d.nlh, config)`的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/interface.go#L31#L48](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/interface.go#L31#L48)，分析如下:
@@ -496,9 +552,150 @@ func newInterface(nlh *netlink.Handle, config *networkConfiguration) (*bridgeInt
 
 **d.createNetwork(config)--->bridgeSetup.queueStep(setupDevice)**
 
+`bridgeSetup.queueStep(setupDevice)`中的setupDevice的作用是创建一个新的bridge interface，它的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/setup_device.go#L13#L51](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/setup_device.go#L13#L51)，分析如下:
+
+```go
+func setupDevice(config *networkConfiguration, i *bridgeInterface) error {
+	var setMac bool
+	// We only attempt to create the bridge when the requested device name is the default one.
+	if config.BridgeName != DefaultBridgeName && config.DefaultBridge {
+		return NonDefaultBridgeExistError(config.BridgeName)
+	}
+	// Set the bridgeInterface netlink.Bridge.
+	i.Link = &netlink.Bridge{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: config.BridgeName,
+		},
+	}
+	// Only set the bridge's MAC address if the kernel version is > 3.3, as it was not supported before that.
+	kv, err := kernel.GetKernelVersion()
+	if err != nil {
+		logrus.Errorf("Failed to check kernel versions: %v. Will not assign a MAC address to the bridge interface", err)
+	} else {
+		setMac = kv.Kernel > 3 || (kv.Kernel == 3 && kv.Major >= 3)
+	}
+	/*
+	LinkAdd adds a new link device. The type and features of the device are taken fromt the parameters in the link object.
+	Equivalent to: `ip link add $link`	
+	*/
+	i.nlh.LinkAdd(i.Link)
+	if setMac {
+		//随机生成一个mac地址
+		hwAddr := netutils.GenerateRandomMAC()
+		if err = i.nlh.LinkSetHardwareAddr(i.Link, hwAddr); err != nil {
+			return fmt.Errorf("failed to set bridge mac-address %s : %s", hwAddr, err.Error())
+		}
+		logrus.Debugf("Setting bridge mac address to %s", hwAddr)
+	}
+	return err
+}
+```
 
 #### 2.3.3 initBridgeDriver()
 
+`initBridgeDriver(controller, config)`的实现位于[moby/daemon/daemon_unix.go#L789#L918](https://github.com/moby/moby/blob/17.05.x/daemon/daemon_unix.go#L789#L918)，分析如下:
+
+```go
+func initBridgeDriver(controller libnetwork.NetworkController, config *config.Config) error {
+	bridgeName := bridge.DefaultBridgeName
+	if config.BridgeConfig.Iface != "" {
+		bridgeName = config.BridgeConfig.Iface
+	}
+	netOption := map[string]string{
+		bridge.BridgeName:         bridgeName,
+		bridge.DefaultBridge:      strconv.FormatBool(true),
+		netlabel.DriverMTU:        strconv.Itoa(config.Mtu),
+		bridge.EnableIPMasquerade: strconv.FormatBool(config.BridgeConfig.EnableIPMasq),
+		bridge.EnableICC:          strconv.FormatBool(config.BridgeConfig.InterContainerCommunication),
+	}
+	// --ip processing
+	if config.BridgeConfig.DefaultIP != nil {
+		netOption[bridge.DefaultBindingIP] = config.BridgeConfig.DefaultIP.String()
+	}
+	var (
+		ipamV4Conf *libnetwork.IpamConf
+		ipamV6Conf *libnetwork.IpamConf
+	)
+	ipamV4Conf = &libnetwork.IpamConf{AuxAddresses: make(map[string]string)}
+	/*
+	It looks for an interface on the OS with the specified name and returns all its IPv4 and IPv6 addresses in CIDR notation.
+	If the interface does not exist, it chooses from a predefined list the first IPv4 address which does not conflict with other interfaces on the system.
+	*/
+	nwList, nw6List, err := netutils.ElectInterfaceAddresses(bridgeName)
+	nw := nwList[0]
+	if len(nwList) > 1 && config.BridgeConfig.FixedCIDR != "" {
+		//将字符串s解析成一个ip地址和子网掩码的结构体中，*net.IPNet
+		_, fCIDR, err := net.ParseCIDR(config.BridgeConfig.FixedCIDR)
+	}
+	// Iterate through in case there are multiple addresses for the bridge
+	for _, entry := range nwList {
+		if fCIDR.Contains(entry.IP) {
+			nw = entry
+			break
+		}
+	}
+	//returns the canonical form for the passed network
+	ipamV4Conf.PreferredPool = lntypes.GetIPNetCanonical(nw).String()
+	//returns the host portion of the ip address identified by the mask
+	//返回主机部分网址
+	hip, _ := lntypes.GetHostPartIP(nw.IP, nw.Mask)
+	//如果ip是全局单播地址，则返回真。
+	if hip.IsGlobalUnicast() {
+		ipamV4Conf.Gateway = nw.IP.String()
+	}
+	if config.BridgeConfig.IP != "" {
+		ipamV4Conf.PreferredPool = config.BridgeConfig.IP
+		ip, _, err := net.ParseCIDR(config.BridgeConfig.IP)
+		ipamV4Conf.Gateway = ip.String()
+	} else if bridgeName == bridge.DefaultBridgeName && ipamV4Conf.PreferredPool != "" {
+		logrus.Infof("Default bridge (%s) is assigned with an IP address %s. Daemon option --bip can be used to set a preferred IP address", bridgeName, ipamV4Conf.PreferredPool)
+	}
+	if config.BridgeConfig.FixedCIDR != "" {
+		_, fCIDR, err := net.ParseCIDR(config.BridgeConfig.FixedCIDR)
+		ipamV4Conf.SubPool = fCIDR.String()
+	}
+	if config.BridgeConfig.DefaultGatewayIPv4 != nil {
+		ipamV4Conf.AuxAddresses["DefaultGatewayIPv4"] = config.BridgeConfig.DefaultGatewayIPv4.String()
+	}
+	//ipv6地址的设置
+	var deferIPv6Alloc bool
+	if config.BridgeConfig.FixedCIDRv6 != "" {
+		_, fCIDRv6, err := net.ParseCIDR(config.BridgeConfig.FixedCIDRv6)
+		ones, _ := fCIDRv6.Mask.Size()
+		deferIPv6Alloc = ones <= 80
+		if ipamV6Conf == nil {
+			ipamV6Conf = &libnetwork.IpamConf{AuxAddresses: make(map[string]string)}
+		}
+		ipamV6Conf.PreferredPool = fCIDRv6.String()
+		for _, nw6 := range nw6List {
+			if fCIDRv6.Contains(nw6.IP) {
+				ipamV6Conf.Gateway = nw6.IP.String()
+				break
+			}
+		}
+	}
+	if config.BridgeConfig.DefaultGatewayIPv6 != nil {
+		if ipamV6Conf == nil {
+			ipamV6Conf = &libnetwork.IpamConf{AuxAddresses: make(map[string]string)}
+		}
+		ipamV6Conf.AuxAddresses["DefaultGatewayIPv6"] = config.BridgeConfig.DefaultGatewayIPv6.String()
+	}
+	v4Conf := []*libnetwork.IpamConf{ipamV4Conf}
+	v6Conf := []*libnetwork.IpamConf{}
+	if ipamV6Conf != nil {
+		v6Conf = append(v6Conf, ipamV6Conf)
+	}
+	// Initialize default network on "bridge" with the same name,这里上文已经分析过
+	_, err = controller.NewNetwork("bridge", "bridge", "",
+		libnetwork.NetworkOptionEnableIPv6(config.BridgeConfig.EnableIPv6),
+		libnetwork.NetworkOptionDriverOpts(netOption),
+		libnetwork.NetworkOptionIpam("default", "", v4Conf, v6Conf, nil),
+		libnetwork.NetworkOptionDeferIPv6Alloc(deferIPv6Alloc))
+	return nil
+}
+```
+
+这个函数的作用大体就是一些基本参数的配置，并在最后新建了一个bridge network
 
 
 ## 3. libnetwork在docker创建时的工作
