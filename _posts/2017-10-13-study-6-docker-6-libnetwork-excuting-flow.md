@@ -91,7 +91,7 @@ func (daemon *Daemon) initNetworkController(config *config.Config, activeSandbox
 }
 ```
 
-#### 2.3.1 libnetwork.New()
+#### 2.3.1 NetworkController---libnetwork.New()
 
 `libnetwork.New(netOptions...)`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L179#L244](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L179#L244)，对于这部分的代码，分析如下：
 
@@ -229,7 +229,7 @@ func (c *controller) startExternalKeyListener() error {
 ```
 
 
-#### 2.3.2 controller.NewNetwork()
+#### 2.3.2 Network---controller.NewNetwork()
 
 `controller.NewNetwork()`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L665#L773](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L665#L773)。以
 
@@ -345,7 +345,7 @@ func (c *controller) addNetwork(n *network) error {
 }
 ```
 
-**c.addNetwork(network)--->d.CreateNetwork()**
+**controller.NewNetwork()--->c.addNetwork(network)--->d.CreateNetwork()**
 
 `d.CreateNetwork()`是以bridge driver为例的，所以它的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L586#L614](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L586#L614)，分析如下:
 
@@ -373,7 +373,7 @@ func (d *driver) CreateNetwork(id string, option map[string]interface{}, nInfo d
 }
 ```
 
-**d.CreateNetwork()--->d.createNetwork(config)**
+**controller.NewNetwork()--->c.addNetwork(network)--->d.CreateNetwork()--->d.createNetwork(config)**
 
 `d.createNetwork(config)`的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L616#L770](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L616#L770)，分析如下:
 
@@ -431,7 +431,7 @@ func (d *driver) createNetwork(config *networkConfiguration) error {
 	/*
 	Create or retrieve the bridge L3 interface
 	newInterface creates a new bridge interface structure. It attempts to find an already existing device identified by the configuration BridgeName field, or the default bridge name when unspecified, but doesn't attempt to create one when missing
-	下面2.3.2.1接着分析
+	下面接着分析
 	*/
 	bridgeIface, err := newInterface(d.nlh, config)
 	network.bridge = bridgeIface
@@ -466,7 +466,7 @@ func (d *driver) createNetwork(config *networkConfiguration) error {
 	*/
 	bridgeAlreadyExists := bridgeIface.exists()
 	if !bridgeAlreadyExists {
-		// SetupDevice create a new bridge interface，创建一个link并分配mac地址，下面2.3.2.2接着分析
+		// SetupDevice create a new bridge interface，创建一个link并分配mac地址，下面接着分析
 		bridgeSetup.queueStep(setupDevice)
 	}
 	// Even if a bridge exists try to setup IPv4.给bridge分配ipv4和gateway ipv4地址
@@ -527,7 +527,9 @@ func (d *driver) createNetwork(config *networkConfiguration) error {
 }
 ```
 
-**2.3.2.1 d.createNetwork(config)--->newInterface(d.nlh, config)**
+下面接着分析`newInterface(d.nlh, config)`和`bridgeSetup.queueStep(setupDevice)`。
+
+**controller.NewNetwork()--->c.addNetwork(network)--->d.CreateNetwork()--->d.createNetwork(config)--->newInterface(d.nlh, config)**
 
 `newInterface(d.nlh, config)`的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/interface.go#L31#L48](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/interface.go#L31#L48)，分析如下:
 
@@ -552,7 +554,7 @@ func newInterface(nlh *netlink.Handle, config *networkConfiguration) (*bridgeInt
 }
 ```
 
-**2.3.2.2 d.createNetwork(config)--->bridgeSetup.queueStep(setupDevice)**
+**controller.NewNetwork()--->c.addNetwork(network)--->d.CreateNetwork()--->d.createNetwork(config)--->bridgeSetup.queueStep(setupDevice)**
 
 `bridgeSetup.queueStep(setupDevice)`中的setupDevice的作用是创建一个新的bridge interface，它的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/setup_device.go#L13#L51](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/setup_device.go#L13#L51)，分析如下:
 
@@ -964,6 +966,8 @@ func (daemon *Daemon) findAndAttachNetwork(container *container.Container, idOrN
 }	
 ```
 
+**connectToNetwork()--->findAndAttachNetwork()--->daemon.FindNetwork(idOrName)**
+
 接下来看看`daemon.FindNetwork(idOrName)`，代码位于[moby/daemon/network.go#L33#L46](https://github.com/moby/moby/blob/17.05.x/daemon/network.go#L33#L46)，主要代码如下：
 
 ```go
@@ -978,6 +982,8 @@ func (daemon *Daemon) FindNetwork(idName string) (libnetwork.Network, error) {
 }
 ```
 
+**connectToNetwork()--->findAndAttachNetwork()--->daemon.FindNetwork(idOrName)--->daemon.GetNetworkByName(idName)**
+
 再继续看`daemon.GetNetworkByName(idName)`，代码位于[moby/daemon/network.go#L69#L78](https://github.com/moby/moby/blob/17.05.x/daemon/network.go#L69#L78)，该函数根据name获取network,如果没有对应名字的network，则返回默认network,主要代码为：
 ```go
 func (daemon *Daemon) GetNetworkByName(name string) (libnetwork.Network, error) {
@@ -989,6 +995,7 @@ func (daemon *Daemon) GetNetworkByName(name string) (libnetwork.Network, error) 
 	return c.NetworkByName(name)
 }
 ```
+**connectToNetwork()--->findAndAttachNetwork()--->daemon.FindNetwork(idOrName)--->daemon.GetNetworkByName(idName)--->c.NetworkByName(name)**
 
 接着看`c.NetworkByName(name)`，代码位于[moby/vendor/github.com/docker/libnetwork/controller.go#L892#L913](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L892#L913)，主要代码为：
 
@@ -1009,6 +1016,8 @@ func (c *controller) NetworkByName(name string) (Network, error) {
 }
 ```
 
+**connectToNetwork()--->findAndAttachNetwork()--->daemon.FindNetwork(idOrName)--->daemon.GetNetworkByName(idName)--->c.NetworkByName(name)--->c.WalkNetworks(s)**
+
 接下来，`c.WalkNetworks(s)`，代码位于[moby/vendor/github.com/docker/libnetwork/controller.go#L884#L890](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L884#L890)，主要代码为：
 
 ```go
@@ -1020,6 +1029,8 @@ func (c *controller) WalkNetworks(walker NetworkWalker) {
 	}
 }
 ```
+
+**connectToNetwork()--->findAndAttachNetwork()--->daemon.FindNetwork(idOrName)--->daemon.GetNetworkByName(idName)--->c.NetworkByName(name)--->c.WalkNetworks(s)--->c.Networks()**
 
 再看看`c.Networks()`，代码位于[moby/vendor/github.com/docker/libnetwork/controller.go#L866#L882](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L866#L882)，主要代码为：
 
@@ -1036,6 +1047,8 @@ func (c *controller) Networks() []Network {
 	return list
 }
 ```
+
+**connectToNetwork()--->findAndAttachNetwork()--->daemon.FindNetwork(idOrName)--->daemon.GetNetworkByName(idName)--->c.NetworkByName(name)--->c.WalkNetworks(s)--->c.Networks()-->c.getNetworksFromStore()**
 
 接着`c.getNetworksFromStore()`，代码位于[moby/vendor/github.com/docker/libnetwork/store.go#L142#L181](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/store.go#L142#L181)，主要代码为：
 
@@ -1105,6 +1118,8 @@ func (daemon *Daemon) getNetworkSandbox(container *container.Container) libnetwo
 }
 ```
 
+**connectToNetwork()--->getNetworkSandbox()--->daemon.netController.WalkSandboxes()**
+
 继续看`daemon.netController.WalkSandboxes()`，代码位于[moby/vendor/github.com/docker/libnetwork/controller.go#L1057#L1063](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L1057#L1063)，主要代码为：
 
 ```go
@@ -1116,6 +1131,8 @@ func (c *controller) WalkSandboxes(walker SandboxWalker) {
 	}
 }
 ```
+
+**connectToNetwork()--->getNetworkSandbox()--->daemon.netController.WalkSandboxes()--->c.Sandboxes()**
 
 接着到`c.Sandboxes()`，代码位于[moby/vendor/github.com/docker/libnetwork/controller.go#L1040#L1055](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L1040#L1055)，主要代码为：
 
@@ -1300,7 +1317,7 @@ func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoi
 
 下面在3.3.3.1分析`n.addEndpoint(ep)`函数。
 
-**3.3.3.1 n.CreateEndpoint()--->n.addEndpoint(ep)**
+**3.3.3.1 connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)**
 
 `n.addEndpoint(ep)`的实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L874#L887](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L874#L887)，主要代码为：
 
@@ -1316,7 +1333,7 @@ func (n *network) addEndpoint(ep *endpoint) error {
 
 下面接着看`n.driver(true)`和`d.CreateEndpoint()`
 
-**n.addEndpoint(ep)--->n.driver(true)**
+**connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->n.driver(true)**
 
 `n.driver(true)`的实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L760#L781](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L760#L781)，主要代码为：
 
@@ -1343,7 +1360,7 @@ func (n *network) driver(load bool) (driverapi.Driver, error) {
 }
 ```
 
-**n.addEndpoint(ep)--->d.CreateEndpoint()**
+**connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->d.CreateEndpoint()**
 
 现在看d.CreateEndpoint(n.id, ep.id, ep.Interface(), ep.generic)调用，d即driver的种类有：bridge、host、ipvlan、macvlan、overlay、remote六种，每种驱动都有`CreateEndpoint()`的实现，这里我们先来看看brdige驱动的`CreateEndpoint()`，实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L902#L1081](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L902#L1081)，主要代码为：
 
@@ -1471,7 +1488,7 @@ func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo,
 
 下面继续分析`addToBridge()`。
 
-**n.addEndpoint(ep)--->d.CreateEndpoint()--->addToBridge()**
+**connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->d.CreateEndpoint()--->addToBridge()**
 
 这里再看看`addToBridge(d.nlh, hostIfName, config.BridgeName)`，实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L848#L869](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L848#L869)，主要代码为：
 
@@ -1487,7 +1504,7 @@ func addToBridge(nlh *netlink.Handle, ifaceName, bridgeName string) error {
 	return nil
 }
 ```
-**n.addEndpoint(ep)--->d.CreateEndpoint()--->addToBridge()--->nlh.LinkSetMaster()**
+**connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->d.CreateEndpoint()--->addToBridge()--->nlh.LinkSetMaster()**
 
 接着到`nlh.LinkSetMaster(link,&netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: bridgeName}})`的调用，它的实现位于[moby/vendor/github.com/vishvananda/netlink/link_linux.go#L380#L391](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/vishvananda/netlink/link_linux.go#L380#L391)，主要代码为：
 
@@ -1511,7 +1528,7 @@ func (h *Handle) LinkSetMaster(link Link, master *Bridge) error {
 }
 ```
 
-**n.addEndpoint(ep)--->d.CreateEndpoint()--->addToBridge()--->nlh.LinkSetMaster()--->h.LinkSetMasterByIndex(link, index)**
+**connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->d.CreateEndpoint()--->addToBridge()--->nlh.LinkSetMaster()--->h.LinkSetMasterByIndex(link, index)**
 
 接着到`h.LinkSetMasterByIndex(link, index)`的调用，它的实现位于[moby/vendor/github.com/vishvananda/netlink/link_linux.go#L413#L430](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/vishvananda/netlink/link_linux.go#L413#L430)，主要代码为：
 
@@ -1543,7 +1560,9 @@ func (h *Handle) LinkSetMasterByIndex(link Link, masterIndex int) error {
 
 目前就先看到这里，再接下去的地方好些太底层了。
 
-#### 3.3.4 ep.Join(sb, joinOptions...)
+#### 3.3.4 ep.Join()
+
+**connectToNetwork()--->ep.Join()**
 
 接着是`ep.Join(sb, joinOptions...)`，分析流程如图：
 
@@ -1563,7 +1582,7 @@ func (ep *endpoint) Join(sbox Sandbox, options ...EndpointOption) error {
 	return ep.sbJoin(sb, options...)
 }
 ```
-**ep.Join()--->ep.sbJoin()**
+**connectToNetwork()--->ep.Join()--->ep.sbJoin()**
 
 这里来到`ep.sbJoin(sb, options...)`的实现，位于[moby/vendor/github.com/docker/libnetwork/endpoint.go#L430#L580](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/endpoint.go#L430#L580)，主要代码为：
 
@@ -1673,7 +1692,7 @@ func (ep *endpoint) sbJoin(sb *sandbox, options ...EndpointOption) (err error) {
 }
 ```
 
-**ep.Join()--->ep.sbJoin()--->d.Join()**
+**connectToNetwork()--->ep.Join()--->ep.sbJoin()--->d.Join()**
 
 `d.Join(nid, epid, sb.Key(), ep, sb.Labels())`分析bridge驱动下的实现，位于[moby/vendor/github.com/docker/libnetwork/drivers//bridge/bridge.go#L1204#L1247](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers//bridge/bridge.go#L1204#L1247)，主要代码为：
 
