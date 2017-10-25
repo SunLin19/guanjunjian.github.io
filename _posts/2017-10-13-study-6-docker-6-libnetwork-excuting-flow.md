@@ -1562,7 +1562,7 @@ func (h *Handle) LinkSetMasterByIndex(link Link, masterIndex int) error {
 }
 ```
 
-目前就先看到这里，再接下去的地方好些太底层了。
+目前就先看到这里，再接下去的地方好像太底层了。
 
 #### 3.3.4 ep.Join()
 
