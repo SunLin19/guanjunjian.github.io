@@ -93,6 +93,8 @@ func (daemon *Daemon) initNetworkController(config *config.Config, activeSandbox
 
 #### 2.3.1 NetworkController---libnetwork.New()
 
+**libnetwork.New()**
+
 `libnetwork.New(netOptions...)`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L179#L244](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L179#L244)，对于这部分的代码，分析如下：
 
 ```go
@@ -230,6 +232,8 @@ func (c *controller) startExternalKeyListener() error {
 
 
 #### 2.3.2 Network---controller.NewNetwork()
+
+**controller.NewNetwork()**
 
 `controller.NewNetwork()`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L665#L773](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L665#L773)。以
 
