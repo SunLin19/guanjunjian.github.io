@@ -91,6 +91,12 @@ func (daemon *Daemon) initNetworkController(config *config.Config, activeSandbox
 }
 ```
 
+这部分的工作有：
+* 1.调用libnetwork的New函数创建NetworkController
+* 2.向controller注册none、host、bridge三个默认network
+
+下面在2.3.1分析生成NetworkController的`libnetwork.New()`,在2.3.2分析生成Network的`controller.NewNetwork()`以及在2.3.3分析`initBridgeDriver()`。
+
 #### 2.3.1 NetworkController---libnetwork.New()
 
 **libnetwork.New()**
@@ -157,6 +163,17 @@ func New(cfgOptions ...config.Option) (NetworkController, error) {
 }
 ```
 
+这部分的工作有：
+* 1.生成并初始化controller结构体
+* 2.初始化stores
+* 3.生成drvregistry,用于存储网络驱动和IPAM驱动
+* 4.将bridge、host、macvlan、null、remote、overlay等驱动初始化函数注册到drvregistry中
+* 5.初始化IPAM驱动注册到drvregistry中
+* 6.populate该controller中的所有network
+* 7./run/docker/libnetwork/container ID.sock开始监听
+
+下面分别在2.3.1.1分析`4.`中提到的bridge驱动初始化函数，在2.3.1.2中分析`7.`中提到的.sock文件的监听。
+
 **2.3.1.1 libnetwork.New()--->bridge驱动的初始化**
 
 从`for _, i := range getInitializers(c.cfg.Daemon.Experimental)`中有`{bridge.Init, "bridge"}`，因此bridge驱动的初始化函数为bridge.Init()，它的实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L149#L159](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L149#L159)，代码分析如下：
@@ -210,7 +227,7 @@ type driver struct {
 
 **2.3.1.2 libnetwork.New()--->c.startExternalKeyListener()**
 
-`c.startExternalKeyListener()`实现位于[moby/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124)。这部分代码的作用是由controller创建一个network。对于这部分的代码，分析如下：
+`c.startExternalKeyListener()`实现位于[moby/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/sandbox_externalkey_unix.go#L105#L124)。对于这部分的代码，分析如下：
 
 ```go
 func (c *controller) startExternalKeyListener() error {
@@ -249,7 +266,7 @@ controller.NewNetwork("bridge", "bridge", "",
 
 ```go
 func (c *controller) NewNetwork(networkType, name string, id string, options ...NetworkOption) (Network, error) {
-	//对于例子中，id=="",这里是查看对应id的network是否存在，如果存在则返回错误
+	//对于例子中，id=="",这里是查看对应id的network是否已经存在，如果已经存在则返回错误
 	if id != "" {
 		c.networkLocker.Lock(id)
 		defer c.networkLocker.Unlock(id)
@@ -262,7 +279,7 @@ func (c *controller) NewNetwork(networkType, name string, id string, options ...
 	if !config.IsValidName(name) {
 		return nil, ErrInvalidName(name)
 	}
-	随机生成一个network id
+	//随机生成一个network id
 	if id == "" {
 		id = stringid.GenerateRandomID()
 	}
@@ -282,7 +299,7 @@ func (c *controller) NewNetwork(networkType, name string, id string, options ...
 	}
 	//network的options挨个进行调用
 	network.processOptions(options...)
-	//根据网络类型，获得驱动以及驱动的capability，但这里没有取driver
+	//根据网络类型，获得驱动以及驱动的capability，true表示如果没在找到这种类型的network的驱动，则进行装载
 	_, cap, err := network.resolveDriver(networkType, true)
 	//如果network的ingress为true，cap的DataScope不为"global"
 	if network.ingress && cap.DataScope != datastore.GlobalScope {
@@ -333,7 +350,18 @@ func (c *controller) NewNetwork(networkType, name string, id string, options ...
 }
 ```
 
-**controller.NewNetwork()--->c.addNetwork(network)**
+这部分的作用：
+* 1.对network id、network name进行有效性验证
+* 2.创建并初始化network结构体，对network结构体进行options处理
+* 3.解析networkTpye，并获取该networkTpye的capability,并根据capability进行一些错误检查。
+* 4.确保network驱动可用，如果不可用则装载
+* 5.为network分配ipam
+* 6.将network添加到controller中
+* 7.设置network的endpoint计数
+
+下面在2.3.2.1分析`6.`中提到的`c.addNetwork(network)`，这其中涉及到了调用driver对network进行创建。
+
+**2.3.2.1 controller.NewNetwork()--->c.addNetwork(network)**
 
 `c.addNetwork(network)`的实现位于[moby/vendor/github.com/docker/libnetwork/controller.go#L580#L864](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/controller.go#L580#L864)，分析如下:
 
@@ -525,13 +553,21 @@ func (d *driver) createNetwork(config *networkConfiguration) error {
 	// Apply the prepared list of steps, and abort at the first error. 
 	//SetupDeviceUp ups the given bridge interface.
 	bridgeSetup.queueStep(setupDeviceUp)
-	//允许上面所有的setupsteps
+	//运行上面所有的setupsteps
 	bridgeSetup.apply()
 	return nil
 }
 ```
+这部分的作用是：
+* 1.根据所要新建的network的config，验证是否与该driver的其他已经存在的network的config冲突
+* 2.新建bridgeNetwork结构体并存储到driver的networks数组中
+* 3.为driver的nlh赋值ns.NlHandle()，类型为*netlink.Handle
+* 4.创建bridgeIface，并赋值给network结构体
+* 5.再次冲突性验证
+* 6.设置network的隔离
+* 7.设置network的setup config，为network的启动做准备，其中包括setupDevice,它创建一个link
 
-下面接着分析`newInterface(d.nlh, config)`和`bridgeSetup.queueStep(setupDevice)`。
+下面接着分析`4.`中提到的`newInterface(d.nlh, config)`和`7.`中提到的`bridgeSetup.queueStep(setupDevice)`。
 
 **controller.NewNetwork()--->c.addNetwork(network)--->d.CreateNetwork()--->d.createNetwork(config)--->newInterface(d.nlh, config)**
 
