@@ -838,7 +838,7 @@ func (daemon *Daemon) connectToNetwork(container *container.Container, idOrName 
 	if container.HostConfig.NetworkMode.IsContainer() {
 		return runconfig.ErrConflictSharedNetwork
 	}
-	//根据network的name或id查找network，并连接，在3.3.3中再详细分析
+	//根据network的name或id查找network，并连接，在3.3.1中再详细分析
 	n, config, err := daemon.findAndAttachNetwork(container, idOrName, endpointConfig)
 	
 	var operIPAM bool
@@ -859,13 +859,13 @@ func (daemon *Daemon) connectToNetwork(container *container.Container, idOrName 
 	err = daemon.updateNetworkConfig(container, n, endpointConfig, updateSettings)
 	//获得netController
 	controller := daemon.netController
-	//获得容器的sandbox,从controller的Sandbox数组中获取,在3.3.4中分析
+	//获得容器的sandbox,从controller的Sandbox数组中获取,在3.3.2中分析
 	sb := daemon.getNetworkSandbox(container)
 	//创建endpoint的配置信息
 	createOptions, err := container.BuildCreateEndpointOptions(n, endpointConfig, sb, daemon.configStore.DNS)
 	//endPoint的名字
 	endpointName := strings.TrimPrefix(container.Name, "/")
-	//创建endpoint,下面在3.3.5中分析
+	//创建endpoint,下面在3.3.3中分析
 	ep, err := n.CreateEndpoint(endpointName, createOptions...)
 	//将network的endpoint信息赋值到NetworkSettings中
 	container.NetworkSettings.Networks[n.Name()] = &network.EndpointSettings{
@@ -886,7 +886,7 @@ func (daemon *Daemon) connectToNetwork(container *container.Container, idOrName 
 		if err != nil {
 			return err
 		}
-		//在3.3.4中分析
+		//在3.3.2中分析
 		sb, err = controller.NewSandbox(container.ID, options...)
 		if err != nil {
 			return err
@@ -896,7 +896,7 @@ func (daemon *Daemon) connectToNetwork(container *container.Container, idOrName 
 	}
 	//根据network创建endpoint join的配置信息
 	joinOptions, err := container.BuildJoinOptions(n)
-	//将endpoint加入sandbox中，将在3.3.6分析
+	//将endpoint加入sandbox中，将在3.3.4分析
 	ep.Join(sb, joinOptions...)
 	//start中传入的managed为false
 	if !container.Managed {
@@ -917,6 +917,13 @@ func (daemon *Daemon) connectToNetwork(container *container.Container, idOrName 
 	return nil
 }
 ```
+
+这部分的工作是
+* 1.查找所要connect的network，将network信息更新到container.NetworkSettings.Networks[]中
+* 2.获取container的sandbox
+* 3.由network创建endpoint
+* 4.若2.中获取的sandbox为nil，则由netController创建sandbox
+* 5.将endpoint加入sandbox中
 
 #### 3.3.1 network---findAndAttachNetwork()
 
@@ -1050,7 +1057,7 @@ func (c *controller) NetworkByName(name string) (Network, error) {
 		}
 		return false
 	}
-	遍历controller中的network
+	//遍历controller中的network
 	c.WalkNetworks(s)
 	return n, nil
 }
@@ -1259,6 +1266,10 @@ func (c *controller) NewSandbox(containerID string, options ...SandboxOption) (s
 	//使用默认sandbox
 	if sb.config.useDefaultSandBox {
 		c.sboxOnce.Do(func() {
+			/*
+				NewSandbox provides a new sandbox instance created in an os specific way  provided a key which uniquely identifies the sandbox
+				下面继续分析
+			*/
 			c.defOsSbox, err = osl.NewSandbox(sb.Key(), false, false)
 		})
 		//osSbox类型为osl.Sandbox，Package osl describes structures and interfaces which abstract os entities
@@ -1272,6 +1283,31 @@ func (c *controller) NewSandbox(containerID string, options ...SandboxOption) (s
 	return sb, nil
 }
 ```
+
+**connectToNetwork()--->NewSandbox()--->osl.NewSandbox()**
+
+接着分析`osl.NewSandbox(sb.Key(), false, false)`,它的实现位于[moby/vendor/github.com/docker/libnetwork/osl/namespace_linux.go#L196#L238](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/osl/namespace_linux.go#L196#L238)，主要代码为：
+
+```go
+func NewSandbox(key string, osCreate, isRestore bool) (Sandbox, error) {
+	//根据上文可以知道，这里isRestore是false，所以会执行下面的代码
+	if !isRestore {
+		//创建network namespace，下面接着分析
+		err := createNetworkNamespace(key, osCreate)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		//createBasePath()函数只执行一次
+		once.Do(createBasePath)
+	}
+	n := &networkNamespace{path: key, isDefault: !osCreate, nextIfIndex: make(map[string]int)}
+}
+```
+
+**connectToNetwork()--->NewSandbox()--->osl.NewSandbox()-->createNetworkNamespace()**
+
+接着分析`createNetworkNamespace(key, osCreate)`，它的实现位于
 
 #### 3.3.3 endpoint---n.CreateEndpoint()
 
