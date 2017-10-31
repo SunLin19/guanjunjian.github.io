@@ -33,7 +33,7 @@ tags:
 而上面的这部分工作分别在daemon初始化和docker创建时执行，所以下面分别按这两方面再详细分析。
 
 
-## 2. libnetwork在daemon初始化时的工作
+## 2. libnetwork在docker daemon初始化时的工作
 
 ### 2.1 libnetwork的工作
 
@@ -742,7 +742,7 @@ func initBridgeDriver(controller libnetwork.NetworkController, config *config.Co
 这个函数的作用大体就是一些基本参数的配置，并在最后新建了一个bridge network
 
 
-## 3. libnetwork在docker创建时的工作
+## 3. libnetwork在docker container创建时的工作
 
 ### 3.1 libnetwork的工作
 
@@ -1302,12 +1302,50 @@ func NewSandbox(key string, osCreate, isRestore bool) (Sandbox, error) {
 		once.Do(createBasePath)
 	}
 	n := &networkNamespace{path: key, isDefault: !osCreate, nextIfIndex: make(map[string]int)}
+	//get network namespace
+	sboxNs, err := netns.GetFromPath(n.path)
+	//create a netlink handle
+	n.nlHandle, err = netlink.NewHandleAt(sboxNs, syscall.NETLINK_ROUTE)
+	//set the timeout on the sandbox netlink handle sockets
+	n.nlHandle.SetSocketTimeout(ns.NetlinkSocketsTimeout)
+	
+	// As starting point, disable IPv6 on all interfaces
+	if !n.isDefault {
+		//disable IPv6 on all interfaces on network namespace
+		setIPv6(n.path, "all", false)
+	}
+	//set up lookback
+	n.loopbackUp()
+	//返回该namespace
+	return n, nil
 }
 ```
 
 **connectToNetwork()--->NewSandbox()--->osl.NewSandbox()-->createNetworkNamespace()**
 
-接着分析`createNetworkNamespace(key, osCreate)`，它的实现位于
+接着分析`createNetworkNamespace(key, osCreate)`，它的实现位于[moby/vendor/github.com/docker/libnetwork/osl/namespace_linux.go#L302#L322](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/osl/namespace_linux.go#L302#L322)，主要代码为：
+
+```go
+func createNetworkNamespace(path string, osCreate bool) error {
+	//创建namespace文件
+	createNamespaceFile(path)
+	cmd := &exec.Cmd{
+		//Returns "/proc/self/exe"，代表当前程序
+		Path:   reexec.Self(),
+		Args:   append([]string{"netns-create"}, path),
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+	//从上文可以看到，osCreate为false，所以下面这段代码不执行
+	if osCreate {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		cmd.SysProcAttr.Cloneflags = syscall.CLONE_NEWNET
+	}
+	//namespace creation reexec command
+	cmd.Run()
+	return nil
+}	
+```
 
 #### 3.3.3 endpoint---n.CreateEndpoint()
 
@@ -1327,12 +1365,14 @@ func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoi
 	ep := &endpoint{name: name, generic: make(map[string]interface{}), iface: &endpointInterface{}}
 	//随机生成一个endpoint ID
 	ep.id = stringid.GenerateRandomID()
-	// Initialize ep.network with a possibly stale copy of n. We need this to get network from
-	// store. But once we get it from store we will have the most uptodate copy possibly.
-	//ep.network初始化赋值为n，是为了之后从store从获取network，从store中获取的network是最新的版本
+	/*
+	Initialize ep.network with a possibly stale copy of n. We need this to get network from store. But once we get it from store we will have the most uptodate copy possibly.
+	ep.network初始化赋值为n，是为了之后从store从获取network，从store中获取的network是最新的版本
+	*/	
 	ep.network = n
 	ep.locator = n.getController().clusterHostID()
-	ep.network, err = ep.getNetworkFromStore()     //根据n，从store中获取最新的network
+	//根据n，从store中获取最新的network
+	ep.network, err = ep.getNetworkFromStore()     
 	n = ep.network
 	//处理endpoint的option,这里的option都是一些函数(type EndpointOption func(ep *endpoint))，也就是使用option这个函数来处理endpoint
 	ep.processOptions(options...)
@@ -1365,11 +1405,11 @@ func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoi
 		//将新生成的mac地址存入endpoint的ipamOptions数组中
 		ep.ipamOptions[netlabel.MacAddress] = ep.iface.mac.String()
 	}
-	给endpoint分配ipv4和ipv6地址
+	//给endpoint分配ipv4和ipv6地址
 	if err = ep.assignAddress(ipam, true, n.enableIPv6 && !n.postIPv6); err != nil {
 		return nil, err
 	}
-	//向network中加入endpoint，在3.3.5.1中继续分析
+	//向network中加入endpoint，在下文中继续分析
 	if err = n.addEndpoint(ep); err != nil {
 		return nil, err
 	}
@@ -1391,31 +1431,31 @@ func (n *network) CreateEndpoint(name string, options ...EndpointOption) (Endpoi
 }
 ```
 
-下面在3.3.3.1分析`n.addEndpoint(ep)`函数。
+下面将分析`n.addEndpoint(ep)`函数。
 
-**3.3.3.1 connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)**
+**connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)**
 
 `n.addEndpoint(ep)`的实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L874#L887](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L874#L887)，主要代码为：
 
 ```go
 func (n *network) addEndpoint(ep *endpoint) error {
-	//获得网络驱动,下面继续分析
+	//获得网络驱动,下面3.3.3.1继续分析
 	d, err := n.driver(true)
-	//调用网络驱动创建endpoint，有bridge、host等,下面继续分析
+	//调用网络驱动创建endpoint，有bridge、host等,下面3.3.3.2继续分析
 	err = d.CreateEndpoint(n.id, ep.id, ep.Interface(), ep.generic)
 	return nil
 }
 ```
 
-下面接着看`n.driver(true)`和`d.CreateEndpoint()`
+下面接着看3.3.3.1的`n.driver(true)`和3.3.3.2的`d.CreateEndpoint()`
 
-**connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->n.driver(true)**
+**3.3.3.1 connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->n.driver(true)**
 
 `n.driver(true)`的实现位于[moby/vendor/github.com/docker/libnetwork/network.go#L760#L781](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/network.go#L760#L781)，主要代码为：
 
 ```go
 func (n *network) driver(load bool) (driverapi.Driver, error) {
-	//根据网络类型获取网络驱动，如果没有，则看load是否为true，是true的话，就载入该网络类型的驱动
+	//根据网络类型从DrvRegistry中获取网络驱动，如果没有，则看load是否为true，是true的话，就载入该网络类型的驱动
 	d, cap, err := n.resolveDriver(n.networkType, load)
 	c := n.getController()
 	//returns true if Cluster is participating as a worker/agent，查看该节点是worker还是agent.
@@ -1436,9 +1476,9 @@ func (n *network) driver(load bool) (driverapi.Driver, error) {
 }
 ```
 
-**connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->d.CreateEndpoint()**
+**3.3.3.2 connectToNetwork()--->n.CreateEndpoint()--->n.addEndpoint(ep)--->d.CreateEndpoint()**
 
-现在看d.CreateEndpoint(n.id, ep.id, ep.Interface(), ep.generic)调用，d即driver的种类有：bridge、host、ipvlan、macvlan、overlay、remote六种，每种驱动都有`CreateEndpoint()`的实现，这里我们先来看看brdige驱动的`CreateEndpoint()`，实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L902#L1081](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L902#L1081)，主要代码为：
+现在看`d.CreateEndpoint(n.id, ep.id, ep.Interface(), ep.generic)`调用，d即driver的种类有：bridge、host、ipvlan、macvlan、overlay、remote六种，每种驱动都有`CreateEndpoint()`的实现，这里我们先来看看brdige驱动的`CreateEndpoint()`，实现位于[moby/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L902#L1081](https://github.com/moby/moby/blob/17.05.x/vendor/github.com/docker/libnetwork/drivers/bridge/bridge.go#L902#L1081)，主要代码为：
 
 ```go
 func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo, epOptions map[string]interface{}) error {
@@ -1483,8 +1523,8 @@ func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo,
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{Name: hostIfName, TxQLen: 0},
 		PeerName:  containerIfName}
-	//添加veth pair
 	/*
+	添加veth pair
 	LinkAdd adds a new link device. The type and features of the device are taken fromt the parameters in the link object. Equivalent to: `ip link add $link`
 	*/
 	if err = d.nlh.LinkAdd(veth); err != nil {
@@ -1502,10 +1542,10 @@ func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo,
 	if config.Mtu != 0 {
 		//设置host端veth的MTU
 		err = d.nlh.LinkSetMTU(host, config.Mtu)
-		//设置sandbox端vethpair的MTU
+		//设置sandbox端veth的MTU
 		err = d.nlh.LinkSetMTU(sbox, config.Mtu)
 	}
-	// Attach host side pipe interface into the bridge，之后分析
+	// Attach host side pipe interface into the bridge，将host veth加入docker0,之后分析
 	if err = addToBridge(d.nlh, hostIfName, config.BridgeName); 
 	//UserlandProxy,每增加一个端口映射，就会增加一个docker-proxy进程，实现宿主机上0.0.0.0地址上对容器的访问代理。
 	//参考http://www.dataguru.cn/thread-544489-1-1.html
@@ -1520,7 +1560,7 @@ func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo,
 			return err
 		}
 	}
-	// Store the sandbox side pipe interface parameters
+	//Store the sandbox side pipe interface parameters，这之后会调用ep.Join()将container的sandbox和endpoint结合
 	endpoint.srcName = containerIfName
 	endpoint.macAddress = ifInfo.MacAddress()
 	endpoint.addr = ifInfo.Address()
@@ -1528,7 +1568,8 @@ func (d *driver) CreateEndpoint(nid, eid string, ifInfo driverapi.InterfaceInfo,
 	// Set the sbox's MAC if not provided. If specified, use the one configured by user, otherwise generate one based on IP.
 	if endpoint.macAddress == nil {
 		endpoint.macAddress = electMacAddress(epConfig, endpoint.addr.IP)
-		if err = ifInfo.SetMacAddress(endpoint.macAddress)
+		ifInfo.SetMacAddress(endpoint.macAddress)
+	}
 	// Up the host interface after finishing all netlink configuration
 	if err = d.nlh.LinkSetUp(host);
 	//对启用了ipv6的情况进行处理
@@ -1573,9 +1614,12 @@ func addToBridge(nlh *netlink.Handle, ifaceName, bridgeName string) error {
 	//finds a link by name and returns a pointer to the object.
 	//获得host端veth
 	link, err := nlh.LinkByName(ifaceName)
-	// LinkSetMaster sets the master of the link device.
-	// Equivalent to: `ip link set $link master $master`
+	/*
+	LinkSetMaster sets the master of the link device.
+	add host link to bridge via netlink.
+	Equivalent to: `ip link set $link master $master`
 	下面详细再看看
+	*/
 	nlh.LinkSetMaster(link,&netlink.Bridge{LinkAttrs: netlink.LinkAttrs{Name: bridgeName}})
 	return nil
 }
@@ -1592,6 +1636,7 @@ func (h *Handle) LinkSetMaster(link Link, master *Bridge) error {
 		masterBase := master.Attrs()
 		//获取正确的link index
 		h.ensureIndex(masterBase)
+		//获得bridge的下标
 		index = masterBase.Index
 	}
 	if index <= 0 {
@@ -1634,7 +1679,7 @@ func (h *Handle) LinkSetMasterByIndex(link Link, masterIndex int) error {
 }
 ```
 
-目前就先看到这里，再接下去的地方好像太底层了。
+目前将host veth加入到对应的bridge中（即docker0），就先看到这里，再接下去的地方好像太底层了。
 
 #### 3.3.4 ep.Join()
 
@@ -1778,7 +1823,7 @@ func (d *driver) Join(nid, eid string, sboxKey string, jinfo driverapi.JoinInfo,
 	defer osl.InitOSContext()()
 	network, err := d.getNetwork(nid)
 	endpoint, err := network.getEndpoint(eid)
-	//从options中获得containerConfig
+	//从options中获得containerConfig，这里的options是sb.Labels()，返回的是sb.config.generic
 	endpoint.containerConfig, err = parseContainerOptions(options)
 	// InterfaceName returns an InterfaceNameInfo go interface to facilitate setting the names for the interface.
 	// 返回一个InterfaceNameInfo的接口，用于名字的设置,返回的是ep.iface,类型endpointInterface
@@ -1788,7 +1833,7 @@ func (d *driver) Join(nid, eid string, sboxKey string, jinfo driverapi.JoinInfo,
 	if network.config.ContainerIfacePrefix != "" {
 		containerVethPrefix = network.config.ContainerIfacePrefix
 	}
-	//设置endpoint srcName和containerVethPrefix
+	//设置endpoint srcName为containerVethPrefix
 	iNames.SetNames(endpoint.srcName, containerVethPrefix)
 	// SetGateway sets the default IPv4 gateway when a container joins the endpoint.
 	err = jinfo.SetGateway(network.bridge.gatewayIPv4)
@@ -1798,9 +1843,11 @@ func (d *driver) Join(nid, eid string, sboxKey string, jinfo driverapi.JoinInfo,
 }
 ```
 
+目前该函数中存在一些疑点，该段函数没有看到sboxKey的使用，endpoint是如何加入sandbox的，还不是很清楚。
+
 ## 结语
 
-本文分析了daemon对container start的处理做了一个简单分析，很多细节部分没有得到很好的分析，比如网络的具体创建、从daemon到containerd的传递，这些内容将在后续的博客中分析。
+本文分析了libnetwork的工作流程，分别从docker daemon初始化时和docker container创建时两方面来分析。docker daemon初始化时，对netController、Network进行了创建；docker container创建时，创建了container的sandbox、endpoint并将endpoint加入sandbox中。本文分别对上述过程进行了简要的分析。
 
 ## 参考
 
