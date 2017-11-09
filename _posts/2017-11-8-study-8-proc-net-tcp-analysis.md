@@ -107,9 +107,9 @@ TCP_CLOSING:11
 
 ## 2. tcp4_seq_show()
 
-`tcp4_seq_show()`函数位于[net/ipv4/tcp_ipv4.c#L2306#L2329](https://github.com/torvalds/linux/blob/master/net/ipv4/tcp_ipv4.c#L2306#L2329),主要代码如下2：
+`tcp4_seq_show()`函数位于[net/ipv4/tcp_ipv4.c#L2306#L2329](https://github.com/torvalds/linux/blob/master/net/ipv4/tcp_ipv4.c#L2306#L2329),主要代码如下3：
 
-```C
+```c
 static int tcp4_seq_show(struct seq_file *seq, void *v)
 {
 	struct tcp_iter_state *st;
