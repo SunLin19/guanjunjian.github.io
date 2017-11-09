@@ -1,11 +1,10 @@
 ---
 layout:     post
-title:      "study7.[转]控制平面和数据平面"
-date:       2017-11-1 11:00:00 
+title:      "study8.netstat.c源码分析"
+date:       2017-11-8 11:00:00 
 author:     "guanjunjian"
 categories: 网络基础知识
 tags:
-    - reprint
     - network
     - study
 ---
@@ -13,14 +12,36 @@ tags:
 * content
 {:toc}
 
-> 控制平面和数据平面的概念。
+> Netstat 命令用于显示各种网络相关信息，如网络连接，路由表，接口状态 (Interface Statistics)，masquerade 连接，多播成员 (Multicast Memberships) 等等
+>
+>在本文中分析netstat.c就是想了解Netstat的实现原理
+>
+>[netstat.c源码](https://github.com/ecki/net-tools/blob/master/netstat.c) 
 
 
 
 
-## 1. 管理平面/控制平面
+## 1. netstat的输出信息
 
-管理平面和控制平面统称为控制平面。
+执行netstat后，其输出结果为：
+
+```
+Active Internet connections (w/o servers)
+Proto Recv-Q Send-Q Local Address Foreign Address State
+tcp 0 2 210.34.6.89:telnet 210.34.6.96:2873 ESTABLISHED
+tcp 296 0 210.34.6.89:1165 210.34.6.84:netbios-ssn ESTABLISHED
+tcp 0 0 localhost.localdom:9001 localhost.localdom:1162 ESTABLISHED
+tcp 0 0 localhost.localdom:1162 localhost.localdom:9001 ESTABLISHED
+tcp 0 80 210.34.6.89:1161 210.34.6.10:netbios-ssn CLOSE
+
+Active UNIX domain sockets (w/o servers)
+Proto RefCnt Flags Type State I-Node Path
+unix 1 [ ] STREAM CONNECTED 16178 @000000dd
+unix 1 [ ] STREAM CONNECTED 16176 @000000dc
+unix 9 [ ] DGRAM 5292 /dev/log
+unix 1 [ ] STREAM CONNECTED 16182 @000000df
+```
+
 
 ### 1.1 管理平面
 
@@ -35,15 +56,8 @@ tags:
 
 show ip route 查看IP路由表，属控制平面范畴（路由信息数据库，RIB）
 
-## 2.数据转发平面
 
-网络设备的基本任务是处理和转发不同端口上各种类型的数据，对于数据处理过程中各种具体的处理转发过程，例如L2/L3/ACL/QOS/组播/安全防护等各功能的具体执行过程，都属于数据转发平面的任务范畴。数据转发平面在网络设备的各种平面任务当中需要占用决大部分的硬件资源，也直接地对其性能表现起决定作用，各个厂家都通过各种技术手段和芯片技术努力地提高网络设备数据平面的处理性能。
- 
-<br/><br/>
-数据转发平面主要靠硬件资源来处理信息。
-
-show ip cef 查看最终迭代的出接口，属数据平面范畴（转发信息数据库，FIB）
 
 ## 参考
 
-* *[关于路由器常说的数据层面和控制层面](http://bbs.51cto.com/thread-819114-1.html)*
+* *[Linux netstat命令详解](https://www.cnblogs.com/ggjucheng/archive/2012/01/08/2316661.html)*
