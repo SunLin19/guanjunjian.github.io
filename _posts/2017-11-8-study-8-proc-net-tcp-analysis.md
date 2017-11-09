@@ -107,32 +107,171 @@ TCP_CLOSING:11
 
 ## 2. tcp4_seq_show()
 
-`tcp4_seq_show()`函数位于[net/ipv4/tcp_ipv4.c#L2306#L2329](https://github.com/torvalds/linux/blob/master/net/ipv4/tcp_ipv4.c#L2306#L2329),主要代码如下3：
+`tcp4_seq_show()`函数位于[net/ipv4/tcp_ipv4.c#L2306#L2329](https://github.com/torvalds/linux/blob/master/net/ipv4/tcp_ipv4.c#L2306#L2329)。
+
+首先需要来认识一下`struct seq_file`，称为序列文件接口。在UNIX的世界里，文件是最普通的概念，所以用文件来作为内核和用户空间传递数据的接口也是再普通不过的事情，并且这样的接口对于shell也是相当友好的，方便管理员通过shell直接管理系统。由于伪文件系统proc文件系统在处理大数据结构（大于一页的数据）方面有比较大的局限性，使得在那种情况下进行编程特别别扭，很容易导致bug，所以序列文件接口被发明出来，它提供了更加友好的接口，以方便程序员。之所以选择序列文件接口这个名字，应该是因为它主要用来导出一条条的记录数据。
+Seq_file的实现基于proc文件。使用Seq_file，用户必须抽象出一个链接对象，然后可以依次遍历这个链接对象。这个链接对象可以是链表，数组，哈希表等等。有两个重要的结构体：1.`seq_operations`：定义了start、next、show、stop四个操作函数；2.`seq_file`：该结构会在seq_open函数调用中分配，然后作为参数传递给每个seq_file的操作函数。Privat变量可以用来在各个操作函数之间传递参数
+
+下面是代码：
 
 ```c
 static int tcp4_seq_show(struct seq_file *seq, void *v)
 {
 	struct tcp_iter_state *st;
 	struct sock *sk = v;
-
+	//set padding width
 	seq_setwidth(seq, TMPSZ - 1);
+	//SEQ_START_TOKEN：通常这个值传递给show的时候，show会打印表格头
 	if (v == SEQ_START_TOKEN) {
+		//向表头输入到seq中
 		seq_puts(seq, "  sl  local_address rem_address   st tx_queue "
 			   "rx_queue tr tm->when retrnsmt   uid  timeout "
 			   "inode");
 		goto out;
 	}
+	//指向文件的私有数据，是特例化一个序列文件的方法
 	st = seq->private;
-
 	if (sk->sk_state == TCP_TIME_WAIT)
 		get_timewait4_sock(v, seq, st->num);
 	else if (sk->sk_state == TCP_NEW_SYN_RECV)
 		get_openreq4(v, seq, st->num);
 	else
+		//下面分析
 		get_tcp4_sock(v, seq, st->num);
 out:
 	seq_pad(seq, '\n');
 	return 0;
+}
+```
+
+接下来看`get_tcp4_sock()`，主要代码如下：
+
+```c
+static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
+{
+	int timer_active;
+	unsigned long timer_expires;
+	const struct tcp_sock *tp = tcp_sk(sk);
+	const struct inet_connection_sock *icsk = inet_csk(sk);
+	const struct inet_sock *inet = inet_sk(sk);
+	const struct fastopen_queue *fastopenq = &icsk->icsk_accept_queue.fastopenq;
+	__be32 dest = inet->inet_daddr;
+	__be32 src = inet->inet_rcv_saddr;
+	//将一个16位数由网络字节顺序转换为主机字节顺序
+	__u16 destp = ntohs(inet->inet_dport);
+	__u16 srcp = ntohs(inet->inet_sport);
+	int rx_queue;
+	int state;
+	//获取定时器类型（timer_active）和超时时间（timer_expires）
+	if (icsk->icsk_pending == ICSK_TIME_RETRANS ||
+	    icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS ||
+	    icsk->icsk_pending == ICSK_TIME_LOSS_PROBE) {
+		timer_active	= 1;
+		timer_expires	= icsk->icsk_timeout;
+	} else if (icsk->icsk_pending == ICSK_TIME_PROBE0) {
+		timer_active	= 4;
+		timer_expires	= icsk->icsk_timeout;
+	} else if (timer_pending(&sk->sk_timer)) {
+		timer_active	= 2;
+		timer_expires	= sk->sk_timer.expires;
+	} else {
+		timer_active	= 0;
+		timer_expires = jiffies;
+	}
+	//read sk->sk_state for lockless contexts
+	state = sk_state_load(sk);
+	//根据tcp的状态，获取receive-queue的值
+	if (state == TCP_LISTEN)
+		rx_queue = sk->sk_ack_backlog;
+	else
+		/* Because we don't lock the socket,
+		 * we might find a transient negative value.
+		 */
+		rx_queue = max_t(int, tp->rcv_nxt - tp->copied_seq, 0);
+	//将tcp的信息加入到f，即传入的seq_file中
+	seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX "
+			"%08X %5u %8d %lu %d %pK %lu %lu %u %u %d",
+		i, src, srcp, dest, destp, state,
+		tp->write_seq - tp->snd_una,
+		rx_queue,
+		timer_active,
+		jiffies_delta_to_clock_t(timer_expires - jiffies),
+		icsk->icsk_retransmits,
+		from_kuid_munged(seq_user_ns(f), sock_i_uid(sk)),
+		icsk->icsk_probes_out,
+		sock_i_ino(sk),
+		atomic_read(&sk->sk_refcnt), sk,
+		jiffies_to_clock_t(icsk->icsk_rto),
+		jiffies_to_clock_t(icsk->icsk_ack.ato),
+		(icsk->icsk_ack.quick << 1) | icsk->icsk_ack.pingpong,
+		tp->snd_cwnd,
+		state == TCP_LISTEN ?
+		    fastopenq->max_qlen :
+		    (tcp_in_initial_slowstart(tp) ? -1 : tp->snd_ssthresh));
+}
+```
+
+## 3. /proc/net/tcp的创建
+
+`/proc/net/tcp`的初始化函数为`tcp4_proc_init_net()`，位于[net/ipv4/tcp_ipv4.c#L2348#L2350](https://github.com/torvalds/linux/blob/master/net/ipv4/tcp_ipv4.c#L2306#L2329)。
+
+```c
+static int __net_init tcp4_proc_init_net(struct net *net)
+{
+	return tcp_proc_register(net, &tcp4_seq_afinfo);
+}
+
+```
+
+首先来看一下`tcp4_seq_afinfo`
+
+```c
+static struct tcp_seq_afinfo tcp4_seq_afinfo = {
+	.name		= "tcp",
+	.family		= AF_INET,
+	.seq_fops	= &tcp_afinfo_seq_fops,
+	.seq_ops	= {
+		.show		= tcp4_seq_show,
+	},
+};
+```
+
+可以看到`name="tcp"`，也就是一会要创建的文件名字是tcp。`.seq_ops.show=tcp4_seq_show()`应该是`cat /proc/net/tcp`时会调用的函数。
+
+接下来看` tcp_proc_register()`
+
+```c
+int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
+{
+	int rc = 0;
+	//proc目录结构体，定义位于fs/proc/internal.h
+	struct proc_dir_entry *p;
+	//赋值afinfo，也就是tcp4_seq_afinfo的seq_operations
+	afinfo->seq_ops.start		= tcp_seq_start;
+	afinfo->seq_ops.next		= tcp_seq_next;
+	afinfo->seq_ops.stop		= tcp_seq_stop;
+	//下面接着分析
+	p = proc_create_data(afinfo->name, S_IRUGO, net->proc_net,
+			     afinfo->seq_fops, afinfo);
+	if (!p)
+		rc = -ENOMEM;
+	return rc;
+}
+``` 
+
+下面接着看`proc_create_data()`
+
+```c
+	/**
+	 * @name: afinfo->name,即"tcp"
+	 * @mode: 读写权限
+	*/
+struct proc_dir_entry *proc_create_data(const char *name, umode_t mode,
+					struct proc_dir_entry *parent,
+					const struct file_operations *proc_fops,
+					void *data)
+{
+	
 }
 ```
 
@@ -141,3 +280,6 @@ out:
 ## 参考
 
 * *[/proc/net/tcp中各项参数说明](http://blog.csdn.net/justlinux2010/article/details/21028797)*
+* *[序列文件(seq_file)接口](http://blog.csdn.net/gangyanliang/article/details/7244664)*
+* *[seq_file工作机制实例](http://blog.csdn.net/liaokesen168/article/details/49183703)*
+* *[proc net arp文件的创建]（http://blog.chinaunix.net/uid-20788636-id-3181318.html）
