@@ -86,14 +86,14 @@ TCP_CLOSING:11
 ```
    1000        0 54165785 4 cd1e6040 25 4 27 3 -1
     |          |    |     |    |     |  | |  | |--> slow start size threshold, 
-	|          |    |     |    |     |  | |  |      or -1 if the threshold is >=0xFFFF 
+	                                                or -1 if the threshold is >=0xFFFF 
     |          |    |     |    |     |  | |  |     （如果慢启动阈值大于等于0xFFFF则显示-1，否则表示慢启动阈值）
     |          |    |     |    |     |  | |  |      
     |          |    |     |    |     |  | |  |----> sending congestion window（当前拥塞窗口大小）
     |          |    |     |    |     |  | |-------> (ack.quick<<1)|ack.pingpong
-	|          |    |     |    |     |  |          （快速确认数和是否启用的标志位的或运算结果）    
+	                                               （快速确认数和是否启用的标志位的或运算结果）    
     |          |    |     |    |     |  |---------> Predicted tick of soft clock (delayed ACK control data)
-	|          |    |     |    |     |             （用来计算延时确认的估值）
+	                                               （用来计算延时确认的估值）
     |          |    |     |    |     |             
     |          |    |     |    |     |------------> retransmit timeout（）（RTO，单位是clock_t）
     |          |    |     |    |------------------> location of socket in memory（socket实例的地址）
