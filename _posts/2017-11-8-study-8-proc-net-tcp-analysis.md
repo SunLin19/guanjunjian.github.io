@@ -264,14 +264,20 @@ int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
 ```c
 	/**
 	 * @name: afinfo->name,即"tcp"
-	 * @mode: 读写权限
+	 * @mode: 读写权限，传入的是S_IRUGO，即(S_IRUSR|S_IRGRP|S_IROTH)
+	 * @parent: 指的应该是/pro/net/目录
+	 * @proc_fops: 传入的是afinfo->seq_fops,所以应该是tcp_afinfo_seq_fops
+	 * @data: 传入的是afinfo，即tcp4_seq_afinfo
 	*/
 struct proc_dir_entry *proc_create_data(const char *name, umode_t mode,
 					struct proc_dir_entry *parent,
 					const struct file_operations *proc_fops,
 					void *data)
 {
+	struct proc_dir_entry *pde;
 	
+	if ((mode & S_IFMT) == 0)
+		mode |= S_IFREG;
 }
 ```
 
