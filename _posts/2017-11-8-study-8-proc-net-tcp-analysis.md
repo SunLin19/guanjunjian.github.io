@@ -225,6 +225,7 @@ static int __net_init tcp4_proc_init_net(struct net *net)
 
 ```
 
+<br/>
 首先来看一下`tcp4_seq_afinfo`
 
 ```c
@@ -240,6 +241,7 @@ static struct tcp_seq_afinfo tcp4_seq_afinfo = {
 
 可以看到`name="tcp"`，也就是一会要创建的文件名字是tcp。`.seq_ops.show=tcp4_seq_show()`应该是`cat /proc/net/tcp`时会调用的函数。
 
+<br/>
 **tcp4_proc_init_net()-->tcp_proc_register()**
 
 接下来看` tcp_proc_register()`
@@ -263,6 +265,7 @@ int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
 }
 ``` 
 
+<br/>
 **tcp4_proc_init_net()-->tcp_proc_register()-->proc_create_data()**
 
 下面接着看`proc_create_data()`
@@ -318,6 +321,7 @@ out:
 
 看完了`proc_create_data()`，下面再分别看`__proc_create()`和`proc_register()`
 
+<br/>
 **tcp4_proc_init_net()-->tcp_proc_register()-->proc_create_data()-->__proc_create()**
 
 首先来看`__proc_create()`，分析如下：
@@ -378,6 +382,7 @@ out:
 }
 ```
 
+<br/>
 **tcp4_proc_init_net()-->tcp_proc_register()-->proc_create_data()-->proc_register()**
 
 接着是`proc_register()`，分析如下：
@@ -419,12 +424,12 @@ struct proc_dir_entry {
 	kuid_t uid;
 	kgid_t gid;
 	loff_t size;
-	const struct inode_operations *proc_iops;
-	const struct file_operations *proc_fops;
-	struct proc_dir_entry *parent;
+	const struct inode_operations *proc_iops;  //proc_file_inode_operations
+	const struct file_operations *proc_fops;  //tcp_afinfo_seq_fops
+	struct proc_dir_entry *parent;  // "/proc/net/"
 	struct rb_root subdir;
 	struct rb_node subdir_node;
-	void *data;
+	void *data;  //tcp4_seq_afinfo
 	atomic_t count;		/* use count */
 	atomic_t in_use;	/* number of callers into module in progress; */
 			/* negative -> it's going away RSN */
@@ -432,9 +437,11 @@ struct proc_dir_entry {
 	struct list_head pde_openers;	/* who did ->open, but not ->release */
 	spinlock_t pde_unload_lock; /* proc_fops checks and pde_users bumps */
 	u8 namelen;
-	char name[];
+	char name[];  //"tcp"
 };
 ```
+
+##
 
 
 
@@ -447,3 +454,4 @@ struct proc_dir_entry {
 * *[序列文件(seq_file)接口](http://blog.csdn.net/gangyanliang/article/details/7244664)*
 * *[seq_file工作机制实例](http://blog.csdn.net/liaokesen168/article/details/49183703)*
 * *[proc net arp文件的创建]（http://blog.chinaunix.net/uid-20788636-id-3181318.html）
+* *[Linux cat 命令源码剖析](http://blog.csdn.net/xzz_hust/article/details/40896079)*
