@@ -213,6 +213,8 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 
 ## 3. /proc/net/tcp的创建
 
+**tcp4_proc_init_net()**
+
 `/proc/net/tcp`的初始化函数为`tcp4_proc_init_net()`，位于[net/ipv4/tcp_ipv4.c#L2348#L2350](https://github.com/torvalds/linux/blob/master/net/ipv4/tcp_ipv4.c#L2306#L2329)。
 
 ```c
@@ -238,6 +240,8 @@ static struct tcp_seq_afinfo tcp4_seq_afinfo = {
 
 可以看到`name="tcp"`，也就是一会要创建的文件名字是tcp。`.seq_ops.show=tcp4_seq_show()`应该是`cat /proc/net/tcp`时会调用的函数。
 
+**tcp4_proc_init_net()-->tcp_proc_register()**
+
 接下来看` tcp_proc_register()`
 
 ```c
@@ -259,27 +263,181 @@ int tcp_proc_register(struct net *net, struct tcp_seq_afinfo *afinfo)
 }
 ``` 
 
+**tcp4_proc_init_net()-->tcp_proc_register()-->proc_create_data()**
+
 下面接着看`proc_create_data()`
 
 ```c
-	/**
-	 * @name: afinfo->name,即"tcp"
-	 * @mode: 读写权限，传入的是S_IRUGO，即(S_IRUSR|S_IRGRP|S_IROTH)
-	 * @parent: 指的应该是/pro/net/目录
-	 * @proc_fops: 传入的是afinfo->seq_fops,所以应该是tcp_afinfo_seq_fops
-	 * @data: 传入的是afinfo，即tcp4_seq_afinfo
-	*/
+/*
+ * @name: afinfo->name,即"tcp"，你要建立的文件名
+ * @mode: 读写权限，是一个八进制，传入的是S_IRUGO，即(S_IRUSR|S_IRGRP|S_IROTH)=00444
+ * @parent: 指的应该是"/pro/net/"目录
+ * @proc_fops: 传入的是afinfo->seq_fops,所以应该是tcp_afinfo_seq_fops
+ * @data: 传入的是afinfo，即tcp4_seq_afinfo
+ */
 struct proc_dir_entry *proc_create_data(const char *name, umode_t mode,
 					struct proc_dir_entry *parent,
 					const struct file_operations *proc_fops,
 					void *data)
 {
 	struct proc_dir_entry *pde;
-	
+	//00444 & 00170000 == 0，所以mode==170444
 	if ((mode & S_IFMT) == 0)
 		mode |= S_IFREG;
+	//S_ISREG(170444)==(((170444) & S_IFMT) == S_IFREG)==(((00170444) & 00170000) == 0100000)==(170000==100000)==false
+	//？？
+	if (!S_ISREG(mode)) {
+		WARN_ON(1);	/* use proc_mkdir() */
+		return NULL;
+	}
+	BUG_ON(proc_fops == NULL);
+	//170444 & 7777 == 444,所以mode==170444
+	if ((mode & S_IALLUGO) == 0)
+		mode |= S_IRUGO;
+	//获得一个初始化了的proc_dir_entry结构体，下面继续分析
+	pde = __proc_create(&parent, name, mode, 1);
+	if (!pde)
+		goto out;
+	//pde->proc_fops==tcp_afinfo_seq_fops
+	pde->proc_fops = proc_fops;
+	//pde->data==tcp4_seq_afinfo
+	pde->data = data;
+	pde->proc_iops = &proc_file_inode_operations;
+	//下面接着分析proc_register()
+	if (proc_register(parent, pde) < 0)
+		goto out_free;
+	return pde;
+out_free:
+	kfree(pde);
+out:
+	return NULL;
+}
+	
 }
 ```
+
+看完了`proc_create_data()`，下面再分别看`__proc_create()`和`proc_register()`
+
+**tcp4_proc_init_net()-->tcp_proc_register()-->proc_create_data()-->__proc_create()**
+
+首先来看`__proc_create()`，分析如下：
+
+```c
+/*
+ * @ parent:指的应该是"/pro/net/"目录
+ * @ name: "tcp"
+ * @ mode: 170444
+ * @ nlink: 1
+ */
+static struct proc_dir_entry *__proc_create(struct proc_dir_entry **parent,
+					  const char *name,
+					  umode_t mode,
+					  nlink_t nlink)
+{
+	struct proc_dir_entry *ent = NULL;
+	const char *fn;
+	/*
+	 * "quick string" -- eases parameter passing, but more importantly
+ 	 * saves "metadata" about the string (ie length and the hash).
+ 	 * /
+	struct qstr qstr;
+	//fn=tcp
+	if (xlate_proc_name(name, parent, &fn) != 0)
+		goto out;
+	qstr.name = fn;
+	qstr.len = strlen(fn);
+	//对文件名字的长度进行检验
+	if (qstr.len == 0 || qstr.len >= 256) {
+		WARN(1, "name len %u\n", qstr.len);
+		return NULL;
+	}
+	if (*parent == &proc_root && name_to_int(&qstr) != ~0U) {
+		WARN(1, "create '/proc/%s' by hand\n", qstr.name);
+		return NULL;
+	}
+	if (is_empty_pde(*parent)) {
+		WARN(1, "attempt to add to permanently empty directory");
+		return NULL;
+	}
+	//分配内存空间,由于proc_dir_entry结构体的name为char name[]，所以这里要为proc_dir_entry加上名字的长度
+	ent = kzalloc(sizeof(struct proc_dir_entry) + qstr.len + 1, GFP_KERNEL);
+	if (!ent)
+		goto out;
+	//给ent的name赋值
+	memcpy(ent->name, fn, qstr.len + 1);	
+	ent->namelen = qstr.len;
+	ent->mode = mode;
+	ent->nlink = nlink;
+	ent->subdir = RB_ROOT;
+	atomic_set(&ent->count, 1);
+	spin_lock_init(&ent->pde_unload_lock);
+	INIT_LIST_HEAD(&ent->pde_openers);
+	proc_set_user(ent, (*parent)->uid, (*parent)->gid);
+out:
+	return ent;
+}
+```
+
+**tcp4_proc_init_net()-->tcp_proc_register()-->proc_create_data()-->proc_register()**
+
+接着是`proc_register()`，分析如下：
+
+```c
+/**
+ * @ dir: 传入的是parent，即"/proc/net"
+ * @ dp: 传入的是pde，即name为"tcp"的proc_dir_entry
+ */
+static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp)
+{
+	int ret;
+	//Return an inode number
+	ret = proc_alloc_inum(&dp->low_ino);
+	if (ret)
+		return ret;
+	write_lock(&proc_subdir_lock);
+	dp->parent = dir;
+	//将新创建的文件添加到其父目录的红黑树中
+	if (pde_subdir_insert(dir, dp) == false) {
+		WARN(1, "proc_dir_entry '%s/%s' already registered\n",
+		     dir->name, dp->name);
+		write_unlock(&proc_subdir_lock);
+		proc_free_inum(dp->low_ino);
+		return -EEXIST;
+	}
+	write_unlock(&proc_subdir_lock);
+	return 0;
+}
+```
+
+到这里结束`tcp4_proc_init_net()`的分析，可以看到，这里就是将一个name为"tcp"的proc_dir_entry加入到了`"/proc/net/"`这个目录下，而再详细看这个name为"tcp"的proc_dir_entry,如下：
+
+```c
+struct proc_dir_entry {
+	unsigned int low_ino;  //inode number
+	umode_t mode;  // 
+	nlink_t nlink; // 1
+	kuid_t uid;
+	kgid_t gid;
+	loff_t size;
+	const struct inode_operations *proc_iops;
+	const struct file_operations *proc_fops;
+	struct proc_dir_entry *parent;
+	struct rb_root subdir;
+	struct rb_node subdir_node;
+	void *data;
+	atomic_t count;		/* use count */
+	atomic_t in_use;	/* number of callers into module in progress; */
+			/* negative -> it's going away RSN */
+	struct completion *pde_unload_completion;
+	struct list_head pde_openers;	/* who did ->open, but not ->release */
+	spinlock_t pde_unload_lock; /* proc_fops checks and pde_users bumps */
+	u8 namelen;
+	char name[];
+};
+```
+
+
+
 
 
 
