@@ -441,7 +441,211 @@ struct proc_dir_entry {
 };
 ```
 
-##
+## 4. cat /proc/net/tcp
+
+分析cat命令，目的是了解cat的时候，调用了哪些`proc_dir_entry`的函数。[cat源码](http://www.gnu.org/software/coreutils/coreutils.html),位于src/cat.c。如 cat 命令不使用任何格式参数, 如 -v, -t. 那么就调用`simple_cat`来完成操作。所以我们这里主要分析`simple_cat`。
+
+首先看看在cat.c主函数中，对`simple_cat()`的调用。
+
+```c
+int
+main (int argc, char **argv)
+{
+	//需要打开的文件的名字，即使"/proc/net/tcp"
+	infile = argv[argind];
+	//得到打开的文件的文件描述符
+	input_desc = open (infile, file_open_mode);
+	...
+	/**
+	 *ptr_align是一个辅助函数. 因为IO操作一次读取一页, 
+	 *ptr_align是使得缓冲数组的起始地址为也大小的整数倍, 以增加IO的效率.
+	 */
+	ok &= simple_cat (ptr_align (inbuf, page_size), insize);
+	...
+}
+```
+
+下面来分析`simple_cat()`：
+
+```c
+static bool
+simple_cat (
+     /* Pointer to the buffer, used by reads and writes.  */
+     char *buf,
+
+     /* Number of characters preferably read or written by each read and write
+        call.  */
+     size_t bufsize)
+{
+	/* Actual number of characters read, and therefore written.  */
+	size_t n_read;
+	/* Loop until the end of the file.  */
+	while (true)
+	{
+		/* Read a block of input.  */
+		/*  普通的read可能被信号中断  */  
+        n_read = safe_read (input_desc, buf, bufsize);
+		if (n_read == SAFE_READ_ERROR)  
+        {  
+          error (0, errno, "%s", infile);  
+          return false;  
+        }  
+		/* End of this file?  */
+		if (n_read == 0)  
+        return true;  
+		/* Write this block out.  */
+		{
+        	/* The following is ok, since we know that 0 < n_read.  */
+       		size_t n = n_read;
+			
+			/* Read up to COUNT bytes at BUF from descriptor FD, retrying if interrupted.
+   			 *Return the actual number of bytes read, zero for EOF, or SAFE_READ_ERROR
+   			 *upon error.  
+			 * full_write 和 safe_read都调用的是 safe_rw, 用宏实现的, 
+             * 查看 safe_write.c 就可以发现其实现的关键. 
+             * 
+             */ 
+        	if (full_write (STDOUT_FILENO, buf, n) != n)
+          		error (EXIT_FAILURE, errno, _("write error"));
+        }
+	}
+	
+}
+```
+
+从`n_read = safe_read (input_desc, buf, bufsize);`可以知道，`safe_read()`根据文件描述符`input_desc`获得文件信息，并将文件内容复制到`buf`中。所以，接下来继续看`safe_read()`。
+在`lib/safe-read.h`中可以找到`safe_read()`，再看`lib/safe-read.c`，有`# define safe_rw safe_read`，所以`safe_read()`是由`safe_rw()`函数实现的，该函数的实现就定义在`lib/safe-read.c`中，代码分析如下：
+
+```c
+/* Read(write) up to COUNT bytes at BUF from(to) descriptor FD, retrying if
+ * interrupted.  Return the actual number of bytes read(written), zero for EOF,
+ * or SAFE_READ_ERROR(SAFE_WRITE_ERROR) upon error.  
+ * 原始的read()函数返回值是 ssize_t
+ * @ fd： input_desc
+ */
+size_t
+safe_rw (int fd, void const *buf, size_t count)
+{
+	for (;;)
+    {
+      ssize_t result = rw (fd, buf, count);
+
+      if (0 <= result)
+        return result;
+      else if (IS_EINTR (errno))
+        continue;
+      else if (errno == EINVAL && BUGGY_READ_MAXIMUM < count)
+        count = BUGGY_READ_MAXIMUM;
+      else
+        return result;
+    }
+}
+```
+
+接着到`rw()`，根据`# define rw read`可以知道，rw实际调用的是`read`，而在`lib/unitsd.in.h`中，有`#   define read rpl_read`，最终在`lib/read.c`中找到`rw()`的实际实现`rpl_read()`，代码如下：
+
+```c
+ssize_t
+rpl_read (int fd, void *buf, size_t count)
+{
+	ssize_t ret = read_nothrow (fd, buf, count);
+	...
+}
+```
+
+接着继续到`read_nothrow()`，代码如下：
+
+```c
+read_nothrow (int fd, void *buf, size_t count)
+{
+	...
+	result = read (fd, buf, count);
+}
+```
+
+所以最终调用的是linux的`read()`。read函数在用户空间是由read系统调用实现的，由编译器编译成软中断int 0x80来进入内核空间，然后在中端门上进入函数`SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)`，从而进入内核空间执行read操作。
+
+## 5. SYSCALL_DEFINE3(read,...)
+
+`SYSCALL_DEFINE3(read,...)`位于`fs/read_write.c`，主要代码如下：
+
+<br/>
+**SYSCALL_DEFINE3(read,...)**
+
+```c
+SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+{
+	//获得fd结构体，包括struct file指针
+	struct fd f = fdget_pos(fd);
+	ssize_t ret = -EBADF;
+
+	if (f.file) {
+		//获取光标位置 
+		loff_t pos = file_pos_read(f.file);
+		//虚拟文件系统读，虚拟文件系统屏蔽了底层的各种文件系统的差异性，让上层应用程序可以忽略底层用的是哪种文件系统
+		ret = vfs_read(f.file, buf, count, &pos);
+		if (ret >= 0)
+			file_pos_write(f.file, pos);
+		fdput_pos(f);
+	}
+	return ret;
+}
+```
+
+接下来看`vfs_read()`。
+
+<br/>
+**SYSCALL_DEFINE3(read,...)-->vfs_read()**
+
+```c
+ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
+{
+	ssize_t ret;
+	//3个if就是判断下接下来的操作是否能进行
+	if (!(file->f_mode & FMODE_READ))
+		return -EBADF;
+	if (!(file->f_mode & FMODE_CAN_READ))
+		return -EINVAL;
+	if (unlikely(!access_ok(VERIFY_WRITE, buf, count)))
+		return -EFAULT;
+	//对当前的位置和需要读取的字节数进行判断是否可行
+	ret = rw_verify_area(READ, file, pos, count);
+	if (!ret) {
+		if (count > MAX_RW_COUNT)
+			count =  MAX_RW_COUNT;
+		//下面接着看
+		ret = __vfs_read(file, buf, count, pos);
+		if (ret > 0) {
+			fsnotify_access(file);
+			add_rchar(current, ret);
+		}
+		inc_syscr(current);
+	}
+
+	return ret;
+}
+```
+
+接下去是`__vfs_read()`
+
+<br/>
+**SYSCALL_DEFINE3(read,...)-->vfs_read()-->__vfs_read()**
+
+```c
+ssize_t __vfs_read(struct file *file, char __user *buf, size_t count,
+		   loff_t *pos)
+{
+	//判断文件是否有自己的读函数，如果有则调用自己的函数
+	if (file->f_op->read)
+		return file->f_op->read(file, buf, count, pos);
+	else if (file->f_op->read_iter)
+		return new_sync_read(file, buf, count, pos);
+	else
+		return -EINVAL;
+}
+```
+
+
 
 
 
@@ -455,3 +659,4 @@ struct proc_dir_entry {
 * *[seq_file工作机制实例](http://blog.csdn.net/liaokesen168/article/details/49183703)*
 * *[proc net arp文件的创建]（http://blog.chinaunix.net/uid-20788636-id-3181318.html）
 * *[Linux cat 命令源码剖析](http://blog.csdn.net/xzz_hust/article/details/40896079)*
+* *[linux文件系统之读流程 SYSCALL_DEFINE3(read, xxx)](http://blog.csdn.net/yuzhihui_no1/article/details/51298498)*
