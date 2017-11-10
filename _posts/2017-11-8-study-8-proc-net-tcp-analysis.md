@@ -645,6 +645,33 @@ ssize_t __vfs_read(struct file *file, char __user *buf, size_t count,
 }
 ```
 
+到这里，我们可以看到，如果读取的是`proc_dir_entry`的话，应该是调用的`proc_dir_entry`的`proc_fops`的read函数，接下来对其进行分析。
+
+## 6. proc_dir_entry的读取
+
+根据前文`3.`中对`"tcp"`这个`proc_dir_entry`的`proc_fops`为`tcp_afinfo_seq_fops`,我们来看看`tcp_afinfo_seq_fops`，位于`net/ipv4/tcp_ipv4.c`，结构体如下：
+
+```c
+static const struct file_operations tcp_afinfo_seq_fops = {
+	.owner   = THIS_MODULE,
+	.open    = tcp_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release_net
+};
+```
+
+接下来看`seq_read()`,如下：
+
+```c
+ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
+{
+	//获取file的数据
+	struct seq_file *m = file->private_data;、
+	...
+}
+```
+
 
 
 
@@ -660,3 +687,4 @@ ssize_t __vfs_read(struct file *file, char __user *buf, size_t count,
 * *[proc net arp文件的创建]（http://blog.chinaunix.net/uid-20788636-id-3181318.html）
 * *[Linux cat 命令源码剖析](http://blog.csdn.net/xzz_hust/article/details/40896079)*
 * *[linux文件系统之读流程 SYSCALL_DEFINE3(read, xxx)](http://blog.csdn.net/yuzhihui_no1/article/details/51298498)*
+* *[proc_dir_entry结构](http://blog.sina.com.cn/s/blog_70441c8e0102wex8.html)*
