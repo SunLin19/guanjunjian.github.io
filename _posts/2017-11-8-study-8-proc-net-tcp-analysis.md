@@ -684,7 +684,7 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 * *[/proc/net/tcp中各项参数说明](http://blog.csdn.net/justlinux2010/article/details/21028797)*
 * *[序列文件(seq_file)接口](http://blog.csdn.net/gangyanliang/article/details/7244664)*
 * *[seq_file工作机制实例](http://blog.csdn.net/liaokesen168/article/details/49183703)*
-* *[proc net arp文件的创建]（http://blog.chinaunix.net/uid-20788636-id-3181318.html）*
+* *[proc net arp文件的创建](http://blog.chinaunix.net/uid-20788636-id-3181318.html)*
 * *[Linux cat 命令源码剖析](http://blog.csdn.net/xzz_hust/article/details/40896079)*
 * *[linux文件系统之读流程 SYSCALL_DEFINE3(read, xxx)](http://blog.csdn.net/yuzhihui_no1/article/details/51298498)*
 * *[proc_dir_entry结构](http://blog.sina.com.cn/s/blog_70441c8e0102wex8.html)*
