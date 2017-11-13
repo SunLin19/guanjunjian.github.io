@@ -645,11 +645,14 @@ ssize_t __vfs_read(struct file *file, char __user *buf, size_t count,
 }
 ```
 
-到这里，我们可以看到，如果读取的是`proc_dir_entry`的话，应该是调用的`proc_dir_entry`的`proc_fops`的read函数，接下来对其进行分析。
+到这里，我们可以看到，如果读取的是`proc_dir_entry`的话，应该是调用的`proc_dir_entry`的`proc_fops`的`read`函数，接下来对其进行分析。
 
 ## 6. proc_dir_entry的读取
 
 根据前文`3.`中对`"tcp"`这个`proc_dir_entry`的`proc_fops`为`tcp_afinfo_seq_fops`,我们来看看`tcp_afinfo_seq_fops`，位于`net/ipv4/tcp_ipv4.c`，结构体如下：
+
+<br/>
+**tcp_afinfo_seq_fops**
 
 ```c
 static const struct file_operations tcp_afinfo_seq_fops = {
@@ -661,18 +664,317 @@ static const struct file_operations tcp_afinfo_seq_fops = {
 };
 ```
 
-接下来看`seq_read()`,如下：
+### 6.1 tcp_seq_open
+
+首先来看一下`tcp_seq_open`
+
+<br/>
+**tcp_afinfo_seq_fops-->tcp_seq_open**
+
+```c
+int tcp_seq_open(struct inode *inode, struct file *file)
+{
+	//返回这个inode对应的proc_inode的proc_dir_entry的data，根据前文可知，这个data==tcp4_seq_afinfo
+	struct tcp_seq_afinfo *afinfo = PDE_DATA(inode);
+	struct tcp_iter_state *s;
+	int err;
+	//下面接着看
+	err = seq_open_net(inode, file, &afinfo->seq_ops,
+			  sizeof(struct tcp_iter_state));
+	if (err < 0)
+		return err;
+
+	s = ((struct seq_file *)file->private_data)->private;
+	s->family		= afinfo->family;
+	s->last_pos		= 0;
+	return 0;
+}
+```
+
+来看`seq_open_net()`
+
+<br/>
+**tcp_afinfo_seq_fops-->tcp_seq_open-->seq_open_net()**
+
+```c
+/**
+  * @ ino: inode
+  * @ f: file
+  * @ ops: afinfo->seq_ops,这其中有.show、.start、.next、.stop函数
+  * @ size: sizeof(struct tcp_iter_state)
+  */
+int seq_open_net(struct inode *ino, struct file *f,
+		 const struct seq_operations *ops, int size)
+{
+	struct net *net;
+	struct seq_net_private *p;
+	BUG_ON(size < sizeof(*p));
+	//获取这个inode所在的网络命名空间
+	net = get_proc_net(ino);
+	if (net == NULL)
+		return -ENXIO;
+	//下面接着看
+	p = __seq_open_private(f, ops, size);
+	if (p == NULL) {
+		put_net(net);
+		return -ENOMEM;
+	}
+#ifdef CONFIG_NET_NS
+	p->net = net;
+#endif
+	return 0;
+}
+```
+
+<br/>
+**tcp_afinfo_seq_fops-->tcp_seq_open-->seq_open_net()-->__seq_open_private()**
+
+```c
+void *__seq_open_private(struct file *f, const struct seq_operations *ops,
+		int psize)
+{
+	int rc;
+	void *private;
+	struct seq_file *seq;
+	private = kzalloc(psize, GFP_KERNEL);
+	if (private == NULL)
+		goto out;
+	//下面接着看
+	rc = seq_open(f, ops);
+	if (rc < 0)
+		goto out_free;
+	seq = f->private_data;
+	seq->private = private;
+	return private;
+
+out_free:
+	kfree(private);
+out:
+	return NULL;
+}
+```
+
+<br/>
+**tcp_afinfo_seq_fops-->tcp_seq_open-->seq_open_net()-->__seq_open_private()-->seq_open()**
+
+```c
+/**
+ *	seq_open -	initialize sequential file
+ *	@file: file we initialize
+ *	@op: method table describing the sequence，afinfo->seq_ops,这其中有.show、.start、.next、.stop函数
+ *	seq_open将@file与@op联系起来
+ *	@op->start()设置迭代器iterator并返回第一个元素
+ *	@op->stop() shuts it down
+ *	@op->next() 返回下一个元素
+ *	@op->show() 将元素信息打印到buffer中
+ */	
+int seq_open(struct file *file, const struct seq_operations *op)
+	struct seq_file *p;
+	WARN_ON(file->private_data);
+	p = kzalloc(sizeof(*p), GFP_KERNEL);
+	...
+	file->private_data = p;
+	mutex_init(&p->lock);
+	//将afinfo->seq_ops赋值给seq_file
+	p->op = op;
+	p->file = file;
+	...	
+}
+```
+
+### 6.2 seq_read
+
+接下来看`seq_read()`。
+
+普通文件struct file的读取函数为seq_read，完成seq_file的读取过程，正常情况下分两次完成：
+
+* 第一次执行执行seq_read时：start->show->next->show...->next->show->next->stop，此时返回内核自定义缓冲区所有内容，即copied !=0,所以会有第二次读取操作。
+* 第二次执行seq_read时：由于此时内核自定义内容都返回，根据seq_file->index指示，所以执行start->stop，返回0，即copied=0，并退出seq_read操作。
+
+整体来看，用户态调用一次读操作，seq_file流程为：该函数调用struct seq_operations结构体顺序为：start->show->next->show...->next->show->next->stop->start->stop来读取顺序文件。
+
+**tcp_afinfo_seq_fops-->tcp_seq_read**
 
 ```c
 ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 {
-	//获取file的数据
+	//获取file的数据，由上文seq_open()可知，这里是一个seq_file，这个seq_file的op==afinfo->seq_ops
 	struct seq_file *m = file->private_data;、
-	...
+	size_t copied = 0;
+	loff_t pos;
+	size_t n;
+	void *p;
+	int err = 0;
+	mutex_lock(&m->lock);
+	m->version = file->f_version;
+	/*
+	 * if request is to read from zero offset, reset iterator to first
+	 * record as it might have been already advanced by previous requests
+	 */
+	if (*ppos == 0)
+		m->index = 0;
+	//如果用户已经读取内容和seq_file中不一致，要将seq_file部分内容丢弃
+	if (unlikely(*ppos != m->read_pos)) {
+		//如果是这样，首先通过seq_start,seq_show,seq_next,seq_show...seq_next,seq_show,seq_stop读取*pos大小内容到seq_file的buf中
+		while ((err = traverse(m, *ppos)) == -EAGAIN)
+			;
+		if (err) {
+			/* With prejudice... */
+			m->read_pos = 0;
+			m->version = 0;
+			m->index = 0;
+			m->count = 0;
+			goto Done;
+		} else {
+			//将起读点赋值给seq_file
+			m->read_pos = *ppos;
+		}
+	}
+	//如果第一次读取seq_file，申请4K大小空间
+	if (!m->buf) {
+		m->buf = seq_buf_alloc(m->size = PAGE_SIZE);
+		if (!m->buf)
+			goto Enomem;
+	}
+	/** if not empty - flush it first
+	  * 如果seq_file中已经有内容，可能在前面通过traverse考了部分内容	 
+	  */
+	if (m->count) {
+		n = min(m->count, size);
+		//拷贝到用户态
+		err = copy_to_user(buf, m->buf + m->from, n);
+		if (err)
+			goto Efault;
+		m->count -= n;
+		m->from += n;
+		size -= n;
+		buf += n;
+		copied += n;
+		/**
+		  * 如果正好通过seq_序列操作拷贝了count个字节，从下个位置开始拷贝
+          * 不太清楚，traverse函数中，m->index已经增加过了，这里还要加？
+		  */
+		if (!m->count) {
+			m->from = 0;
+			m->index++;
+		}
+		if (!size)
+			goto Done;
+	}
+	/** we need at least one record in buffer
+	  * 假设该函数从这里开始执行，pos=0，当第二次执行时，pos =上次遍历的最后下标 + 1 >0,
+	  * 所以在start中，需要对pos非0特殊处理
+	  */ 
+	pos = m->index;
+	//p为seq_start返回的字符串指针，pos=0；
+	p = m->op->start(m, &pos);
+	
+	while (1) {
+		err = PTR_ERR(p);
+		/**
+		  * 如果通过start或next遍历出错，即返回的p出错，则退出循环,
+		  * 一般情况下，在第二次seq_open时，通过start即出错[pos变化]，退出循环
+		  */
+		if (!p || IS_ERR(p))
+			break;
+		//将p所指的内容显示到seq_file结构的buf缓冲区中
+		err = m->op->show(m, p);
+		//如果通过show输出出错，退出循环，此时表明buf已经溢出
+		if (err < 0)
+			break;
+		/**
+		  * 如果seq_show返回正常[即seq_file的buf未溢出，则返回0],
+		  * 此时将m->count设置为0，要将m->count设置为0
+	      */
+		if (unlikely(err))
+			m->count = 0;
+		//一般情况下，m->count==0,所以该判定返回false，#define unlikely(x) __builtin_expect(!!(x), 0)用于分支预测，提高系统流水效率
+		if (unlikely(!m->count)) {
+			p = m->op->next(m, p, &pos);
+			m->index = pos;
+			continue;
+		}
+		//一般情况下，经过seq_start->seq_show到达这里[基本上是这一种情况]，或者在err！=0 [即show出错] && m->count != 0时到达这里
+		if (m->count < m->size)
+			goto Fill;
+		m->op->stop(m, p);
+		kvfree(m->buf);
+		m->count = 0;
+		m->buf = seq_buf_alloc(m->size <<= 1);
+		if (!m->buf)
+			goto Enomem;
+		m->version = 0;
+		pos = m->index;
+		p = m->op->start(m, &pos);
+	}
+	/**
+	  * 正常情况下，进入到这里，此时已经将所有的seq_file文件拷贝到buf中,
+	  * 且buf未溢出，这说明seq序列化操作返回的内容比较少，少于4KB
+	  */
+	m->op->stop(m, p);
+	m->count = 0;
+	goto Done;
+Fill:
+	//一般情况在上面的while循环中只经历了seq_start和seq_show函数，然后进入到这里，在这个循环里，执行下面循环
+	while (m->count < size) {
+		size_t offs = m->count;
+		loff_t next = pos;
+		p = m->op->next(m, p, &next);
+		/**
+		  * 如果seq_file的buf未满： seq_next,seq_show,....seq_next->跳出
+		  * 如果seq_file的buf满了：则offs表示了未满前最大的读取量，此时p返回自定义结构内容的指针，
+		  * 但是后面show时候只能拷贝了该内容的一部分，导致m->cont == m->size判断成立，
+		  * 从而m->count回滚到本次拷贝前，后面的pos++表示下次从下一个开始拷贝
+          */
+		if (!p || IS_ERR(p)) {
+			err = PTR_ERR(p);
+			break;
+		}
+		err = m->op->show(m, p);
+		//如果seq_file的buf满:   seq_next,seq_show,....seq_next,seq_show->跳出
+		if (seq_has_overflowed(m) || err) {
+			m->count = offs;
+			if (likely(err <= 0))
+				break;
+		}
+		pos = next;
+	}
+	//最后执行seq_stop函数
+	m->op->stop(m, p);
+	n = min(m->count, size);
+	//将最多size大小的内核缓冲区内容拷贝到用户态缓冲区buf中
+	err = copy_to_user(buf, m->buf, n);
+	if (err)
+		goto Efault;
+	copied += n;
+	m->count -= n;
+	//如果本次给用户态没拷贝完，比如seq_file中count=100，但是n=10，即拷贝了前10个，则下次从10位置开始拷贝，这种情况一般不会出现
+	if (m->count)
+		m->from = n;
+	else  //一般情况下，pos++,下次遍历时从next中的下一个开始，刚开始时，让seq_func遍历指针递减,但是每次以k退出后，下次继续从k递减，原来是这里++了，所以遍历最好让指针递增
+		pos++;
+	m->index = pos;
+Done:
+	if (!copied)
+		copied = err;
+	else {
+		*ppos += copied;
+		m->read_pos += copied;
+	}
+	file->f_version = m->version;
+	mutex_unlock(&m->lock);
+	// 返回拷贝的字符数目，将copied个字符内容从seq_file的buf中拷贝到用户的buf中
+	return copied;
+Enomem:
+	err = -ENOMEM;
+	goto Done;
+Efault:
+	err = -EFAULT;
+	goto Done;
 }
 ```
 
-
+接下来，就来看start、show、next、stop这四个函数。
 
 
 
@@ -688,3 +990,5 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 * *[Linux cat 命令源码剖析](http://blog.csdn.net/xzz_hust/article/details/40896079)*
 * *[linux文件系统之读流程 SYSCALL_DEFINE3(read, xxx)](http://blog.csdn.net/yuzhihui_no1/article/details/51298498)*
 * *[proc_dir_entry结构](http://blog.sina.com.cn/s/blog_70441c8e0102wex8.html)*
+* *[linux下proc文件的读写(部分转载)](http://blog.csdn.net/hunanchenxingyu/article/details/8102956)*
+* *[seq_file文件的内核读取过程](https://www.cnblogs.com/Wandererzj/archive/2012/04/16/2452209.html)*
