@@ -925,7 +925,7 @@ Fill:
 		  * 如果seq_file的buf满了：则offs表示了未满前最大的读取量，此时p返回自定义结构内容的指针，
 		  * 但是后面show时候只能拷贝了该内容的一部分，导致m->cont == m->size判断成立，
 		  * 从而m->count回滚到本次拷贝前，后面的pos++表示下次从下一个开始拷贝
-          */
+		  */
 		if (!p || IS_ERR(p)) {
 			err = PTR_ERR(p);
 			break;
@@ -974,8 +974,31 @@ Efault:
 }
 ```
 
-接下来，就来看start、show、next、stop这四个函数。
+接下来，就来看start、show、next、stop这四个函数。由前文可知:
 
+```c
+static struct tcp_seq_afinfo tcp4_seq_afinfo = {
+	.name		= "tcp",
+	.family		= AF_INET,
+	.seq_fops	= &tcp_afinfo_seq_fops,
+	.seq_ops	= {
+		.start      = tcp_seq_start,
+		.show		= tcp4_seq_show,
+		.next		= tcp4_seq_next,
+		.stop		= tcp4_seq_stop,
+	},
+};
+```
+
+**6.2.1 tcp_seq_start()**
+
+```c
+static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct tcp_iter_state *st = seq->private;
+	void *rc;
+}
+```
 
 
 
@@ -992,3 +1015,4 @@ Efault:
 * *[proc_dir_entry结构](http://blog.sina.com.cn/s/blog_70441c8e0102wex8.html)*
 * *[linux下proc文件的读写(部分转载)](http://blog.csdn.net/hunanchenxingyu/article/details/8102956)*
 * *[seq_file文件的内核读取过程](https://www.cnblogs.com/Wandererzj/archive/2012/04/16/2452209.html)*
+* *[linux 读取proc文件之seq_file浅析1](http://blog.csdn.net/zhanshenwu/article/details/24555323)*
