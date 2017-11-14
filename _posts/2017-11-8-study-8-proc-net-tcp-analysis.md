@@ -451,7 +451,7 @@ struct proc_dir_entry {
 int
 main (int argc, char **argv)
 {
-	//需要打开的文件的名字，即使"/proc/net/tcp"
+	//需要打开的文件的名字，即"/proc/net/tcp"
 	infile = argv[argind];
 	//得到打开的文件的文件描述符
 	input_desc = open (infile, file_open_mode);
@@ -793,6 +793,7 @@ int seq_open(struct file *file, const struct seq_operations *op)
 
 整体来看，用户态调用一次读操作，seq_file流程为：该函数调用struct seq_operations结构体顺序为：start->show->next->show...->next->show->next->stop->start->stop来读取顺序文件。
 
+<br/>
 **tcp_afinfo_seq_fops-->tcp_seq_read**
 
 ```c
@@ -990,6 +991,7 @@ static struct tcp_seq_afinfo tcp4_seq_afinfo = {
 };
 ```
 
+<br/>
 **6.2.1 tcp_seq_start()**
 
 ```c
@@ -997,6 +999,31 @@ static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct tcp_iter_state *st = seq->private;
 	void *rc;
+	//如果来到了最后一位，暂且不看，先往下看
+	if (*pos && *pos == st->last_pos) {
+		rc = tcp_seek_last_pos(seq);
+		if (rc)
+			goto out;
+	}
+
+	st->state = TCP_SEQ_STATE_LISTENING;
+	st->num = 0;
+	st->bucket = 0;
+	st->offset = 0;
+	//如果pos为0，则返回SEQ_START_TOKEN，用于让show函数输出文件头
+	//如果不是0，则调用tcp_get_idx()，下面接着看
+	rc = *pos ? tcp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
+}
+```
+
+<br/>
+**tcp_seq_start()-->tcp_get_idx(seq, *pos - 1)**
+
+```c
+static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
+{
+	void *rc;
+	struct tcp_iter_state *st = seq->private;
 }
 ```
 
