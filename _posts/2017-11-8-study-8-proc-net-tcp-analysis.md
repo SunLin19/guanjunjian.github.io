@@ -657,7 +657,7 @@ ssize_t __vfs_read(struct file *file, char __user *buf, size_t count,
 ```c
 static const struct file_operations tcp_afinfo_seq_fops = {
 	.owner   = THIS_MODULE,
-	.open    = tcp_seq_open,
+	.open    = tcp_seq_open, //将文件与seq_file关联
 	.read    = seq_read,
 	.llseek  = seq_lseek,
 	.release = seq_release_net
@@ -739,7 +739,7 @@ void *__seq_open_private(struct file *f, const struct seq_operations *ops,
 	private = kzalloc(psize, GFP_KERNEL);
 	if (private == NULL)
 		goto out;
-	//下面接着看
+	//下面接着看，将file、seq_file、seq_ops关联起来
 	rc = seq_open(f, ops);
 	if (rc < 0)
 		goto out_free;
@@ -1016,3 +1016,5 @@ static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
 * *[linux下proc文件的读写(部分转载)](http://blog.csdn.net/hunanchenxingyu/article/details/8102956)*
 * *[seq_file文件的内核读取过程](https://www.cnblogs.com/Wandererzj/archive/2012/04/16/2452209.html)*
 * *[linux 读取proc文件之seq_file浅析1](http://blog.csdn.net/zhanshenwu/article/details/24555323)*
+* *[kernel module编程（八）：读取proc文件之seq_file](http://blog.csdn.net/flowingflying/article/details/4566701)*
+* *[走马观花： Linux 系统调用 open 七日游（一）](http://blog.chinaunix.net/uid-20522771-id-4419666.html)*
