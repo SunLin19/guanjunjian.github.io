@@ -37,16 +37,19 @@ tags:
 
 由R，我们可以定义**链路共享**的目标。对于每个class c，它需要做到
 
+```
 Rc = min(CRc, ARc + Bc)        [eq1]
+```
 
 其中Bc表示从祖先节点（ancestors）借来的速率，它的定义如下
 
+```
        Qc Rp
 Bc = -----------------------------  iff min[Pi over D(p)]>=Pc  [eq2]
      sum[Qi over D(p) where Pi=Pc]
 
 Bc = 0   otherwise      [eq3]
-
+```
 
 
 
