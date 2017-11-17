@@ -29,9 +29,11 @@ tags:
 * Leaf:是那些子孙节点的class，只有leaf可以拥有数据包队列(packet queue)。
 * Level：class的level决定了该class在分层（hierarchy）中的位置，叶子（Leaves）为level 0，根类(root classes)为LEVEL_COUNT-1，而inner class的level都比其父节点少一。可以看下图（LEVEL_COUNT=3 there）。
 * Mode：class的mode是人为规定的值，由R、AR、和CR计算而来，可能的模式有：
-*       Red: R > CR
-*       Yellow: R <= CR and R > AR
-*       Green otherwise
+```
+       Red: R > CR
+       Yellow: R <= CR and R > AR
+       Green otherwise
+```
 * D(c)：将会列出所有backlogged leaves，这些backlogged leaves是c的子孙节点，而这些backlogged leaves的class和c都是yellow状态。换言之，会列出所有想要从c这个父节点borrow的c的叶子节点。
 
 ## 2. 链路共享的目标
