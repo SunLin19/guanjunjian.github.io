@@ -74,7 +74,7 @@ Bc = 0   otherwise      [eq3]
 
 ## 4. CBQ提示
 
-从`[eq1]`中可以看到，HTB的目标是CBQ目标子集的更严格定义。所以如果我们满足了HTB的目标，那也肯定满足了CBQ的目标。因此HTB是CBQ的一种。
+从`参考[1]`中可以看到，HTB的目标是CBQ目标子集的更严格定义。所以如果我们满足了HTB的目标，那也肯定满足了CBQ的目标。因此HTB是CBQ的一种。
 
 ## 5. HTB调度
 
@@ -132,10 +132,33 @@ inner slot的列表包含yellow children（由D(c)设定）。
 
 htb_dequeue将所有待定的更改（pending changes）实施到将要出队的level的even queue(wait queue)中。这也是在每一层都有一个even queue的原因--------在图5.中，如果仅仅改变level 0的even queue，然后出队level 0就足够，那就不需要改变level 1和level 2中class的even queue状态。这是因为在更高level的优先级队列可以没有事件(no event)，这样可以防止更低level的拥有grenn class。
 
+事件存在测试（event existence test）有一个捷径（short-circuit）。因为我们经常需要检测某个时间点是否有事件(event)，所以我为每一个level添加了`htb_sched::near_ev_cache`，cache中存储了以jiffy为时间单位的最近事件（nearest event）。快速测试已经能够满足。一般来说，能够达到10-30%速度的提升。
 
+颜色在代码中成为模式（mode）。
 
+```
+    0=Red=HTB_CANT_SEND
+	1=Yellow=HTB_MAY_BORROW
+	2=Green=HTB_CAN_SEND
+```
 
+由`htb_class_mode`计算是否为漏桶（leaky bucket）[参考2]。需要注意的是，有一个全局变量`HTB_HYSTERESIS`，它会将滞后的“burst”大小添加到模式计算（mode computation）中。这意味着更少的模式变化，可以得到15%的速度提升。
 
+**Waitlist存在规则**。当class的mode不是`HTB_CAN_SEND (Green)`时，它将会被添加到waitlist中。
+
+Linux qdisc应该支持显示drop请求。我增加了特殊的`htb_class::leaf`以能够做到drop请求。每一个优先级都有`drop_list`和`htb_sched::drops list`。对于给定的level，`drop_list`和`htb_sched::drops list`存储了所有的active class。当要drop的时候，我会从优先级最低的active list中选择。
+
+HTB使用“真正的”DRR(定义域[参考4]中)。在linux中，CBQ使用的quantum可以小于MTU--------这更通用，但它的复杂度不再是O(1)。这意味着你必须使用正确的速度规模------>quantum转换，这样所有的quantum都会大于MTU。
+
+## 7. Acknowledments
+
+I'd like to say thanks to numerous people from Linux world who helped and motivated me a lot.
+
+[1] Link-sharing and Resource Management models for Packet Networks, Sally Floyd and Van Jacobson, 1995 
+[2] Leaky Bucket, J. Turner, IEEE vol 24 1986 
+[3] HTB for Linux, http://luxik.cdi.cz/~devik/qos/htb 
+[4] Efficient Fair Queuing using Deficit Round Robin, M. Shreedhar and G. Varghese 
+[5] WF2Q: Worst-case Fair Weighted Fair Queuing, J.C.R. Bennet and Hui Zhang
 
 ## 参考
 
