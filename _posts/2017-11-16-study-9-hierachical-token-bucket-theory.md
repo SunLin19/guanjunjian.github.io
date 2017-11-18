@@ -137,7 +137,7 @@ htb_dequeue将所有待定的更改（pending changes）实施到将要出队的
 颜色在代码中成为模式（mode）。
 
 ```
-    0=Red=HTB_CANT_SEND
+	0=Red=HTB_CANT_SEND
 	1=Yellow=HTB_MAY_BORROW
 	2=Green=HTB_CAN_SEND
 ```
