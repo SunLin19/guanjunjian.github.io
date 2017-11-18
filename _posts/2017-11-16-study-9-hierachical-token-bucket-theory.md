@@ -134,7 +134,7 @@ htb_dequeue将所有待定的更改（pending changes）实施到将要出队的
 
 事件存在测试（event existence test）有一个捷径（short-circuit）。因为我们经常需要检测某个时间点是否有事件(event)，所以我为每一个level添加了`htb_sched::near_ev_cache`，cache中存储了以jiffy为时间单位的最近事件（nearest event）。快速测试已经能够满足。一般来说，能够达到10-30%速度的提升。
 
-颜色在代码中成为模式（mode）。
+颜色在代码中称为模式（mode）：
 
 ```
 	0=Red=HTB_CANT_SEND
