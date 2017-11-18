@@ -82,7 +82,7 @@ Bc = 0   otherwise      [eq3]
 
 在HTB调度（struct htb_sched）中有一棵class树(struct htb_class)。同时还有一个全局列表变量**self feed** list（htb_sched::row），它位于下图的最右边一列，self feed由self slot组成。每一个priority每一个level都有一个slot（one slot per priority per level）。因此在例子中有6个self slots（现在先忽略white slot，这里原文有错）。每一个self slot拥有一个class列表(list)--------list与class之间由彩色线条描述出对应关系。在同一个slot中的class拥有相同的level和相同的优先级。
 
-self slot的列表中包含所有有“借”需求的green class（由D(c)设定）。
+self slot的列表中包含所有有“数据包堆积”的green class（由D(c)设定）。
 
 每个inner class（非叶子class）都有**inner feed** slot（htb_class::inner.feed）。每一个priority（红-优先级高，蓝-优先级低）每一个inner class都有一个inner feed slot。与self slot一样，inner feed slot也有一个class列表（list），这些class有同样的优先级，而且这些class必须是slot的拥有者inner class的孩子节点。
 
@@ -92,39 +92,39 @@ inner slot的列表包含yellow children（由D(c)设定）。
 ![](/img/study/study-9-hierachical-token-bucket-theory/feed2.gif)
 
 
-**white slot**不是真正地属于self feed，但是这样画更方便。white slot是**wait queue**,每一个level都有一个wait queue(htb_sched::wait_pq, htb_class::pq_node)。wait queue中包含所有该level中red或yellow的class。class根据wait time(这里可能原文有错)（htb_class::pq_key）进行存储，也根据wait time改变颜色（htb_class::mode），这是因为颜色的改变是异步的（asynchronous）。
+**white slot**不是真正地属于self feed（在代码中），但是这样画更方便。white slot是**wait queue**,每一个level都有一个wait queue(htb_sched::wait_pq, htb_class::pq_node)。wait queue中包含所有该level中red或yellow的class。class根据wait time(这里可能原文有错)（htb_class::pq_key）进行存储，也根据wait time改变颜色（htb_class::mode），这是因为颜色的改变是异步的（asynchronous）。
 
 
- 可能你已经看到，如果我们能够把所有class放置在正确的list中，那么选择下一个数据包进行出队，会变得很简单。首先来看self feed list，选择一个最低level最高优先权（lowest level，highest prio）的非空slot（有连线的slot）。在图1.中没有这样的slot，所以没有数据包可以发送。在图2.中，level 0的red slot有class D,那么class D现在可以发送。
+可能你已经看到，如果我们能够把所有class放置在正确的list中，那么选择下一个数据包进行出队，会变得很简单。首先来看self feed list，选择一个最低level最高优先权（lowest level，highest prio）的非空slot（有连线的slot）。在图1.中没有这样的slot，所以没有数据包可以发送。在图2.中，level 0的red slot有class D,那么class D现在可以发送。
 
-我们再仔细观察图1.图2.。在图1.中有“无数据包堆积叶子节点”（所有no backlogged leaf将会被细线圈绘制）,所以这里没有什么事情需求处理。在图2.中，class C和class D都有数据包到达，因此我们需要激活这些class（htb_activate），而又因为他们都是green，所以我们直接将他们添加到适当的self slot中。出队操作将会首先选择class D，如果C包中的数据还没被清除，那么会继续选择C（不太可能，unlikely）。
+我们再仔细观察图1.图2.。在图1.中有“无数据包堆积叶子节点”（所有no backlogged leaf将会被细线圈绘制）,所以这里没有什么事情需求处理。在图2.中，class C和class D都有数据包到达，因此我们需要active这些class（htb_activate），而又因为他们都是green，所以我们直接将他们添加到适当的self slot中。出队操作将会首先选择class D，如果C包中的数据还没被清除，那么会继续选择C（不太可能，unlikely）。
 
 ![](/img/study/study-9-hierachical-token-bucket-theory/feed3.gif)
 ![](/img/study/study-9-hierachical-token-bucket-theory/feed4.gif)
 
-我们假设D class（htb_dequeue_tree）中的数据包进行出队操作（dequeued，htb_dequeue），我们把这个包的大小称为漏桶（leaky bucket，htb_charge_class）。它迫使D改变它的速率并将颜色改为黄色。作为变化的一部分(htb_change_class_mode)，我们需要将D从self feed中删除（htb_deactivate_prios和htb_remove_class_from_row），并将D添加到B的inner feed（htb_activate_prios）中。同时也需要递归地将B添加到B所在level的self fedd（htb_add_class_to_row）中。因为D在一段时间后会变回green，我们将D添加到level 0的priority event queue（htb_add_to_wait_tree）中。
+我们假设D class（htb_dequeue_tree）中的数据包进行出队操作（dequeued，htb_dequeue），我们把这个包的大小称为漏桶（leaky bucket，htb_charge_class）。它迫使D改变它的速率并将颜色改为黄色。作为变化的一部分(htb_change_class_mode)，我们需要将D从self feed中删除（htb_deactivate_prios和htb_remove_class_from_row），并将D添加到B的inner feed（htb_activate_prios）中。同时也需要递归地将B添加到B所在level的self feed（htb_add_class_to_row）中。因为D在一段时间后会变回green，我们将D添加到level 0的priority event queue（while slot,htb_add_to_wait_tree）中。
 
 接着，出队操作将选择C，即使C的优先权低于D。因为C位于更低的level,而根据`[eq2]`，我们应该首先服务level更低的class。这也是在直观上正确的解释--------当自己就可以发送时，为什么要“借”。
 
 我们假设C出队，然后将状态改为red（达到ceil速率）。在这种状态下，C不能“借”。再假设D中的一些数据发送出去了，因此B改为yellow。现在你应该可以解释所有的步骤了：
-* 1.将B从B的self feed list中移除
-* 2.将B添加到wait queue
-* 3.将A添加到A的self fedd list
+* 1.将B从level 1的self feed list中移除
+* 2.将B添加到level 1的wait queue
+* 3.将A添加到level 2的self feed list
 * 4.将B添加到A的inner feed list
-* 5.将C添加到wait queue
+* 5.将C添加到level 0的wait queue
 
 现在你可以看清self和inner feed list是如何建立“借”路径的了。从图4.的线条中可以看出，从最顶端的self slot，下到D，所以D现在可以发送数据。
 
 ![](/img/study/study-9-hierachical-token-bucket-theory/feed5.gif)
 ![](/img/study/study-9-hierachical-token-bucket-theory/feed6.gif)
 
-我们看一个更复杂的场景。A达到ceil，E开始堆积数据包(be backlogged)。C变回green。变化很细微琐碎，可以看到的是即使inner feed没有使用，它们也被维护着。看A的inner feed的红色部分，从图5.中可以看到，多个class可以在同一个feed中。E和C可以同时进行出队操作。为确保`[eq2]`中Q的正确分配，也为了本状态的保持，我们需要应用DRR（Deficit Round Robin）和cycle对这两个class进行操作。这说起来很简单，但是做起很难，我们下面详细分析。
+我们看一个更复杂的场景。A达到ceil，E开始堆积数据包(be backlogged)。C变回green。变化很细微琐碎，可以看到的是即使inner feed没有使用，它们也被维护着。看A的inner feed的蓝色部分（原文可能有错），从图6.中可以看到，多个class可以在同一个feed中。E和C可以同时进行出队操作。为确保`[eq2]`中Q的正确分配，也为了本状态的保持，我们需要应用DRR（Deficit Round Robin）和cycle对这两个class（C和E）进行操作。这说起来很简单，但是做起很难，我们下面详细分析。
 
 依附于inner feed或self feed的class其实是一颗红黑树（rb-tree）。因此每个这样的list是根据classid来存储的。classid是一个该层次(hierarchy)中的常数。我们需要记住每个self slot list中的active class（htb_sched::ptr）,这样可以快速地找到叶子节点，从而进行出队操作。下一次树遍历（htb_lookup_leaf）将会把变化传播到树的上层（upper levels）。
 
 你可能对为什么list按classid存储有疑问，原因很简单，DRR原理假设数据包堆积类（backlogged class）保持在同一个位置。只有DRR的拥有这个属性。在HTB中，class在list之间的迁移太频繁，这将对比率精度产生不利影响。
 
-图6.中，3个类发生改变，A变green可以发送，而E和C变成yellow。最重要的一点是，inner class可以有更多的优先级（htb_class::prio_activity）变为active，而叶子class只有一个（htb_class::aprio）。所以你可以看到，red/blue线条对从A的self feed连接到A和B中，再分别到D和E。在图5.中也可以看到相似的现象。A以blue/low prio为C和B（即E）服务,如果这里D没有active，那么我们将从C和E之间，使用DRR计算对哪个class进行出队操作。
+图6.中，3个类发生改变，A变green可以发送，而E和C变成yellow。最重要的一点是，inner class可能因为多个优先级slot（htb_class::prio_activity）变为active，而叶子class只有一个slot（htb_class::aprio）。所以你可以看到，red/blue线条对从A的self feed连接到A和B中，再分别到D和E。在图5.中也可以看到相似的现象。A以blue/low prio为C和B（即E）服务,如果这里D没有active，那么我们将从C和E之间，使用DRR计算对哪个class进行出队操作。
 
 ## 6. 实现细节
 
