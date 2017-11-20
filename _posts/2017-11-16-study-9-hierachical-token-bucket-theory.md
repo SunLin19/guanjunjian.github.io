@@ -3,7 +3,7 @@ layout:     post
 title:      "study9.分层令牌桶原理---Hierachical token bucket theory「译」"
 date:       2017-11-16 21:00:00 
 author:     "guanjunjian"
-categories: 网络基础知识
+categories: 网络流量控制
 tags:
     - network
     - tc
