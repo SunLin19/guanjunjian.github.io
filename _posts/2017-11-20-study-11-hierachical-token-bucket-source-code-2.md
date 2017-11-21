@@ -51,6 +51,47 @@ HTB**运行过程中**会将不同类别不同优先权的数据包进行有序�
 * `htb_class_ops`:HTB类别操作结构，对应于Qdisc_class_ops。有htb_graft(设置叶子节点的流控方法)、htb_leaf(增加子节点)、htb_walk(遍历)等
 * `htb_qdisc_ops`:HTB流控操作结构
 
+各种流控算法是通过流控操作结构（Qdisc_ops）实现，在构建新的Qdisc时，需要传入Qdisc_ops（`qdisc_alloc(struct net_device *dev, struct Qdisc_ops *ops)`），所以来看看HTB流控队列的基本操作结构，Qdisc_ops--------`htb_qdisc_ops`：
+
+```c
+static struct Qdisc_ops htb_qdisc_ops = {  
+ .next  = NULL,  
+ .cl_ops  = &htb_class_ops,  
+ .id  = "htb",  
+ .priv_size = sizeof(struct htb_sched),  
+ .enqueue = htb_enqueue,  
+ .dequeue = htb_dequeue,  
+ .requeue = htb_requeue,  
+ .drop  = htb_drop,  
+ .init  = htb_init,  
+ .reset  = htb_reset,  
+ .destroy = htb_destroy,  
+// 更改操作为空  
+ .change  = NULL /* htb_change */,  
+ .dump  = htb_dump,  
+ .owner  = THIS_MODULE,  
+}; 
+```
+
+接着是HTB流控队列类别操作结构，Qdisc_class_ops--------`htb_class_ops`：
+
+```c
+static struct Qdisc_class_ops htb_class_ops = {  
+ .graft  = htb_graft,  
+ .leaf  = htb_leaf,  
+ .get  = htb_get,  
+ .put  = htb_put,  
+ .change  = htb_change_class,  
+ .delete  = htb_delete,  
+ .walk  = htb_walk,  
+ .tcf_chain = htb_find_tcf,  
+ .bind_tcf = htb_bind_filter,  
+ .unbind_tcf = htb_unbind_filter,  
+ .dump  = htb_dump_class,  
+ .dump_stats = htb_dump_class_stats,  
+}; 
+```
+
 ## 3. HTB的TC操作命令 
 
 为了更好理解HTB各处理函数，先用HTB的配置实例过程来说明各种操作调用了哪些HTB处理函数，以下的配置实例取自HTB Manual, 属于最简单分类配置:
@@ -79,7 +120,7 @@ tc class add dev eth0 parent 1:1 classid 1:11 htb rate 10kbps ceil 100kbps
 tc class add dev eth0 parent 1:1 classid 1:12 htb rate 60kbps ceil 100kbps
 ```
 
-在内核中将调用htb_change_class()函数来修改HTB参数 
+在内核中将调用`htb_change_class()`函数来修改HTB参数 
 
 **3.3 数据包分类**
 
@@ -93,7 +134,7 @@ tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip src 1.2.3.4 fl
 #其他数据包将作为缺省类, 0x10012
 ```
 
-在内核中将调用htb_find_tcf(), htb_bind_filter()函数来将为HTB绑定过滤表
+在内核中将调用`htb_find_tcf()`, `htb_bind_filter()`函数来将为HTB绑定过滤表
 
 **3.4 设置每个叶子节点的流控方法**
 
@@ -106,7 +147,7 @@ tc qdisc add dev eth0 parent 1:11 handle 30: pfifo limit 10
 tc qdisc add dev eth0 parent 1:12 handle 40: sfq perturb 10
 ```
 
-在内核中会使用htb_leaf()查找HTB叶子节点, 使用htb_graft()函数来设置叶子节点的流控方法。
+在内核中会使用`htb_leaf()`查找HTB叶子节点, 使用`htb_graft()`函数来设置叶子节点的流控方法。
 
 ## 4. HTB类别操作
 
@@ -126,6 +167,64 @@ tc qdisc add dev eth0 parent 1:12 handle 40: sfq perturb 10
 
 ## 5. HTB一些操作函数
 
+**转换函数**
+* `L2T`:将长度转换为令牌数
+* `htb_hash`:HTB哈希计算, 限制哈希结果小于16, 因为只有16个HASH表, 这个大小是定死的  
+
+**查询函数**
+* `htb_find`:根据句柄handle查找HTB节点
+
+**分类函数**
+* `htb_classid`:获取HTB类别结构的ID
+* `htb_classify`:HTB分类操作, 对数据包进行分类, 然后根据类别进行相关操作，返回NULL表示没找到, 返回-1表示是直接通过(不分类)的数据包
+
+**激活类别**
+* `htb_activate`:激活类别结构, 将该类别节点作为数据包提供者, 而数据类别表提供是一个有序表, 以RB树形式实现
+* `htb_activate_prios(struct htb_sched *q, struct htb_class *cl)`:激活操作, 建立数据提供树。cl->prio_activity为0时就是一个空函数, 不过从前面看prio_activity似乎是不会为0的
+* `htb_add_to_id_tree`:将类别添加到红黑树中
+* `htb_add_class_to_row`:将类别添加到self feed(row)
+
+**关闭类别**
+* `htb_deactivate`:将类别叶子节点从活动的数据包提供树中去掉 
+* `htb_deactivate_prios`:将类别从inner feed中移除（feed chains）
+* `htb_remove_class_from_row`:将类别从self feed中移除(row)
+
+**初始化**
+* `htb_init`:初始化函数
+* `htb_timer`:HTB定时器函数
+* `htb_rate_timer`:HTB速率定时器函数
+
+**丢包**
+* `htb_drop`:丢包函数，try to drop from each class (by prio) until one succeed
+
+**复位**
+* `htb_reset`:复位函数，reset all classes
+
+**释放**
+* `htb_destroy`:释放函数，always caled under BH & queue lock
+
+**输出HTB参数**
+* `htb_dump`
+
+**入队**
+* `htb_enqueue`
+
+**重入队 **
+* `htb_requeue`
+
+**出队**
+* `htb_dequeue`
+* `htb_dequeue_tree`:从指定的层次和优先权的RB树节点中取数据包
+* `htb_lookup_leaf`:查找叶子分类节点
+* `htb_charge_class`:关于类别节点的令牌和缓冲区数据的更新计算, 调整类别节点的模式
+* `htb_change_class_mode`:调整类别节点的发送模式 
+* `htb_class_mode`:计算类别节点的模式 
+* `htb_add_to_wait_tree`:将类别节点添加到等待树(white slot)
+* `htb_do_events`:对第level号等待树的类别节点进行模式调整
+* `htb_delay_by`:HTB延迟处理
+
+一下仔细分析比较重要的函数。
+
 **5.1 入队**
 
 ```c
@@ -134,12 +233,16 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	int ret;
 	// HTB私有数据结构  
 	struct htb_sched *q = qdisc_priv(sch);
-	// 对数据包进行分类
+	/** 对数据包进行分类
+	  * NULL，数据包drop
+	  * -1，数据包直接发送，下文中#define HTB_DIRECT (struct htb_class*)-1
+	  * leaf class,其他情况
+	  */
 	struct htb_class *cl = htb_classify(skb, sch, &ret);
 	if (cl == HTB_DIRECT) {
 	// 分类结果是直接发送
 		/* enqueue to helper queue */
-		// 如果直接发送队列中的数据包长度小于队列限制值, 将数据包添加到队列末尾
+		// 如果直接发送队列中的数据包长度小于直接发送队列长度最大值, 将数据包添加到队列末尾
 		if (q->direct_queue.qlen < q->direct_qlen) {
 			__skb_queue_tail(&q->direct_queue, skb);
 			q->direct_pkts++;
@@ -150,7 +253,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 			return NET_XMIT_DROP;
 		}
 #ifdef CONFIG_NET_CLS_ACT
-// 定义了NET_CLS_ACT的情况(支持分类动作)
+	// 定义了NET_CLS_ACT的情况(支持分类动作)
 	} else if (!cl) {
 		// 分类没有结果, 丢包
 		if (ret == NET_XMIT_BYPASS)
@@ -158,7 +261,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 		kfree_skb(skb);
 		return ret;
 #endif
-	// 有分类结果, 进行分类相关的叶子节点流控结构的入队操作
+	// 有分类结果, 进行分类相关的叶子节点流控结构（是指3.4中为叶子节点设置的流控，例如pfifo）的入队操作
 	} else if (cl->un.leaf.q->enqueue(skb, cl->un.leaf.q) !=
 		   NET_XMIT_SUCCESS) {
 		// 入队不成功的话丢包

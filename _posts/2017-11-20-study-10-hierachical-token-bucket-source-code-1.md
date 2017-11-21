@@ -30,7 +30,7 @@ tags:
 数据发出流控处理时，上层的所有处理已经完成，数据包已经交到网卡设备进行发送，在数据发送时进行相关的流控处理网络数据的出口函数为dev_queue_xmit()。
 
 图1.输出流控流程：
-![](/img/study/study-9-hierachical-token-bucket-source-code-1/1-egress-qdisc.png)
+![](/img/study/study-10-hierachical-token-bucket-source-code-1/1-egress-qdisc.png)
 
 ## 2. 网卡设备的qdisc初始化
 
@@ -39,12 +39,12 @@ tags:
 在网卡设备的初始化函数register_netdevice()函数中调用dev_init_scheduler()函数对网卡设备的流控队列处理进行了初始化, 也就是说每个网络网卡设备的qdisc指针都不会是空的。
 
 图2.qdisc初始化流程1---noop_qdisc
-![](/img/study/study-9-hierachical-token-bucket-source-code-1/2-qdisc-init-noop_qdisc.png)
+![](/img/study/study-10-hierachical-token-bucket-source-code-1/2-qdisc-init-noop_qdisc.png)
 
 当然noop_qdisc中的调度是不可用的, 只进行丢包处理；网卡在激活(dev_open)时会调用dev_activate()函数重新对qdisc指针赋值，但未对qdisc_ingress赋值。
 
 图3.qdisc初始化流程2---qdisc重新赋值
-![](/img/study/study-9-hierachical-token-bucket-source-code-1/3-qdisc-init-dev_activate.png)
+![](/img/study/study-10-hierachical-token-bucket-source-code-1/3-qdisc-init-dev_activate.png)
 
 ## 3. 数据结构
 
@@ -187,7 +187,7 @@ struct qdisc_rate_table
 
 ## 4. 基本操作
 
-各种流控算法是通过流控操作结构实现，然后这些操作结构登记到内核的流控链表，在使用时可为网卡构造新的流控结构，将该结构和某种流控操作结构挂钩，这样就实现网卡采用某种策略发送数据进行流控，所有操作在用户空间都可通过tc程序设置。 
+各种流控算法是通过流控操作结构（Qdisc_ops）实现，然后这些操作结构登记到内核的流控链表，在使用时可为网卡构造新的流控结构，将该结构和某种流控操作结构挂钩，这样就实现网卡采用某种策略发送数据进行流控，所有操作在用户空间都可通过tc程序设置。 
 
 ### 4.1 Qdisc的一些基本操作
 
