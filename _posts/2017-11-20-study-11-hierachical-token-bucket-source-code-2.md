@@ -185,7 +185,96 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 **5.2 出队**
 
+HTB的出队是个非常复杂的处理过程, 函数调用过程为:
+
+```
+htb_dequeue  
+  -> __skb_dequeue  
+  -> htb_do_events  
+    -> htb_safe_rb_erase  
+    -> htb_change_class_mode  
+    -> htb_add_to_wait_tree  
+  -> htb_dequeue_tree  
+    -> htb_lookup_leaf  
+    -> htb_deactivate  
+    -> q->dequeue  
+    -> htb_next_rb_node  
+    -> htb_charge_class  
+      -> htb_change_class_mode  
+      -> htb_safe_rb_erase  
+      -> htb_add_to_wait_tree  
+  -> htb_delay_by 
+```
+
 ```c
+static struct sk_buff *htb_dequeue(struct Qdisc *sch)
+{
+	struct sk_buff *skb = NULL;
+	// HTB私有数据结构
+	struct htb_sched *q = qdisc_priv(sch);
+	int level;
+	long min_delay;
+	// 保存当前时间滴答数
+	q->jiffies = jiffies;
+
+	/* try to dequeue direct packets as high prio (!) to minimize cpu work */
+	// 先从当前直接发送队列取数据包, 直接发送队列中的数据有最高优先级, 可以说没有流量限制
+	skb = __skb_dequeue(&q->direct_queue);
+	if (skb != NULL) {
+	// 取到数据包, 更新参数, 非阻塞, 返回数据包
+		sch->flags &= ~TCQ_F_THROTTLED;
+		sch->q.qlen--;
+		return skb;
+	}
+	// 如果HTB流控结构队列长度为0, 返回空
+	if (!sch->q.qlen)
+		goto fin;
+	// 获取当前有效时间值
+	PSCHED_GET_TIME(q->now);
+	// 最小延迟值初始化为最大整数 
+	min_delay = LONG_MAX;
+	q->nwc_hit = 0;
+	// 遍历树的所有层次, 从叶子节点开始
+	for (level = 0; level < TC_HTB_MAXDEPTH; level++) {
+		/* common case optimization - skip event handler quickly */
+		int m;
+		long delay;
+		// 计算延迟值, 是取数据包失败的情况下更新HTB定时器的延迟时间
+		// 比较ROW树中该层节点最近的事件定时时间是否已经到了
+		if (time_after_eq(q->jiffies, q->near_ev_cache[level])) {
+			// 时间到了, 处理HTB事件, 返回值是下一个事件的延迟时间 
+			delay = htb_do_events(q, level);
+			// 更新本层最近定时时间
+			q->near_ev_cache[level] =
+			    q->jiffies + (delay ? delay : HZ);
+		} else
+			// 时间还没到, 计算两者时间差
+			delay = q->near_ev_cache[level] - q->jiffies;
+			// 更新最小延迟值, 注意这是在循环里面进行更新的, 循环找出最小的延迟时间
+			if (delay && min_delay > delay)
+				min_delay = delay;
+			// 该层次的row_mask取反, 实际是为找到row_mask[level]中为1的位, 为1表示该树有数据包可用
+			m = ~q->row_mask[level];
+			while (m != (int)(-1)) {
+			// m的数据位中第一个0位的位置作为优先级值, 从低位开始找, 也就是prio越小, 实际数据的优先权越大, 越先出队
+				int prio = ffz(m);
+				m |= 1 << prio;
+				skb = htb_dequeue_tree(q, prio, level);
+				if (likely(skb != NULL)) {
+					// 数据包出队成功, 更新参数, 退出循环, 返回数据包	
+					sch->q.qlen--;
+					// 取数据包成功就要去掉流控节点的阻塞标志
+					sch->flags &= ~TCQ_F_THROTTLED;
+					goto fin;
+				}
+			}
+		}
+	// 循环结束也没取到数据包, 队列长度非0却不能取出数据包, 表示流控节点阻塞
+	// 进行阻塞处理, 调整HTB定时器, 最大延迟5秒
+	htb_delay_by(sch, min_delay > 5 * HZ ? 5 * HZ : min_delay);
+fin:
+	return skb;
+}
 ```
 
 **5.3 其他操作（不详细介绍）**

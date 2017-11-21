@@ -128,7 +128,7 @@ inner slot的列表包含yellow children（由D(c)设定）。
 
 ## 6. 实现细节
 
-以上的图片应该足以帮助理解源码。但仍然有一些小提示。`htb_sched::row_mask[level] `表示哪个优先级在level上激活。比如图6.中，`row_mask = { 0,0,3 }`（row_mask[2]==3,因为优先级1和2都激活了），图3.中，`row_mask = { 2,1,0 }`。这使得有激活资格的level更快地被找到。
+以上的图片应该足以帮助理解源码。但仍然有一些小提示。`htb_sched::row_mask[level] `表示哪个优先级在level上激活。比如图6.中，`row_mask = { 0,0,3 }`（row_mask[2]==3,因为优先级1和2都激活了，二进制11=十进制3，第一个1表示优先级2，第二个1表示优先级1，因为优先级数值越大，优先级越低，其中white slot不算），图3.中，`row_mask = { 2,1,0 }`（二进制，row_mask={10,01,00}）。这使得有激活资格的level更快地被找到。
 
 htb_dequeue将所有待定的更改（pending changes）实施到将要出队的level的even queue(wait queue)中。这也是在每一层都有一个even queue的原因--------在图5.中，如果仅仅改变level 0的even queue，然后出队level 0就足够，那就不需要改变level 1和level 2中class的even queue状态。这是因为在更高level的优先级队列可以没有事件(no event)，这样可以防止更低level的拥有grenn class。
 
