@@ -170,36 +170,48 @@ tc qdisc add dev eth0 parent 1:12 handle 40: sfq perturb 10
 **转换函数**
 * `L2T`:将长度转换为令牌数
 * `htb_hash`:HTB哈希计算, 限制哈希结果小于16, 因为只有16个HASH表, 这个大小是定死的  
+ 
 **查询函数**
 * `htb_find`:根据句柄handle查找HTB节点
+
 **分类函数**
 * `htb_classid`:获取HTB类别结构的ID
 * `htb_classify`:HTB分类操作, 对数据包进行分类, 然后根据类别进行相关操作，返回NULL表示没找到, 返回-1表示是直接通过(不分类)的数据包
+
 **激活类别**
 * `htb_activate`:激活类别结构, 将该类别节点作为数据包提供者, 而数据类别表提供是一个有序表, 以RB树形式实现
 * `htb_activate_prios(struct htb_sched *q, struct htb_class *cl)`:激活操作, 建立数据提供树。cl->prio_activity为0时就是一个空函数, 不过从前面看prio_activity似乎是不会为0的
 * `htb_add_to_id_tree`:将类别添加到红黑树中
 * `htb_add_class_to_row`:将类别添加到self feed(row)
+
 **关闭类别**
 * `htb_deactivate`:将类别叶子节点从活动的数据包提供树中去掉 
 * `htb_deactivate_prios`:将类别从inner feed中移除（feed chains）
 * `htb_remove_class_from_row`:将类别从self feed中移除(row)
+
 **初始化**
 * `htb_init`:初始化函数
 * `htb_timer`:HTB定时器函数
 * `htb_rate_timer`:HTB速率定时器函数
+
 **丢包**
 * `htb_drop`:丢包函数，try to drop from each class (by prio) until one succee
+
 **复位**
 * `htb_reset`:复位函数，reset all classes
+
 **释放**
 * `htb_destroy`:释放函数，always caled under BH & queue lock
+
 **输出HTB参数**
 * `htb_dump`
+
 **入队**
 * `htb_enqueue`
+
 **重入队**
 * `htb_requeue`
+
 **出队**
 * `htb_dequeue`
 * `htb_dequeue_tree`:从指定的层次和优先权的RB树节点中取数据包
@@ -211,8 +223,8 @@ tc qdisc add dev eth0 parent 1:12 handle 40: sfq perturb 10
 * `htb_do_events`:对第level号等待树的类别节点进行模式调整
 * `htb_delay_by`:HTB延迟处理
 
-</br>
-</br>
+<br/>
+<br/>
 以下仔细分析比较重要的函数。
 
 **5.1 入队**
