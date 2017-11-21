@@ -288,6 +288,50 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 大部分情况下数据包都不会进入直接处理队列, 而是进入各类别叶子节点, 因此入队的成功与否就在于叶子节点使用何种流控算法, 大都应该可以入队成功的， 入队不涉及类别节点模式的调整。 
 
+接下来再看看`htb_activate(q, cl);`。
+
+**htb_activate()**
+
+```c
+/** 
+ * htb_activate - 将叶子节点cl插入适合的active self feed中 
+ * 
+ * Routine学习(新的)叶子节点优先级，并根据优先级激活feed chain。它可以安全地调用已经激活的叶子
+ * 它也可以将叶子节点添加到droplist中
+ * 激活类别结构, 将该类别节点作为数据包提供者, 而数据类别表提供是一个有序表, 以RB树形式实现
+ */ 
+static inline void htb_activate(struct htb_sched *q, struct htb_class *cl)
+{
+	BUG_TRAP(!cl->level && cl->un.leaf.q && cl->un.leaf.q->q.qlen);
+	// 如果类别的prio_activity参数为0才进行操作, 非0表示已经激活了
+	// leaf.aprio保存当前的leaf.prio
+	if (!cl->prio_activity) {
+	// prio_activity是通过叶子节点的prio值来设置的, 至少是1, 最大是1<<7, 非0值
+		cl->prio_activity = 1 << (cl->un.leaf.aprio = cl->un.leaf.prio);
+		// 进行实际的激活操作
+		htb_activate_prios(q, cl);
+		// 根据leaf.aprio添加到指定的优先权位置的丢包链表
+		list_add_tail(&cl->un.leaf.drop_list,
+			      q->drops + cl->un.leaf.aprio);
+	}
+}
+```
+
+接下来再到`htb_activate_prios(q, cl);`。
+
+**htb_activate_prios()**
+
+```c
+/** 
+ * htb_activate_prios - 创建active class的feed chain 
+ * 
+ * The class is connected to ancestors and/or appropriate rows 
+ * for priorities it is participating on. cl->cmode must be new 
+ * (activated) mode. It does nothing if cl->prio_activity == 0. 
+ */  
+```
+
+
 **5.2 出队**
 
 HTB的出队是个非常复杂的处理过程, 函数调用过程为:
