@@ -296,11 +296,12 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 接下来再看看`htb_activate(q, cl);`。
 
+<br/>
 **htb_enqueue()--->htb_activate()**
 
 ```
 htb_enqueue()
-	->htb_activate()
+	-> htb_activate(q, cl)
 ```
 
 ```c
@@ -330,12 +331,13 @@ static inline void htb_activate(struct htb_sched *q, struct htb_class *cl)
 
 接下来再到`htb_activate_prios(q, cl);`。
 
+<br/>
 **htb_enqueue()--->htb_activate()--->htb_activate_prios()**
 
 ```
 htb_enqueue()
 	-> htb_activate()
-		-> htb_activate_prios()
+		-> htb_activate_prios(q, cl)
 ```
 
 ```c
@@ -391,19 +393,91 @@ static void htb_activate_prios(struct htb_sched *q, struct htb_class *cl)
 
 接下来需要分别看`htb_add_to_id_tree()`和`htb_add_class_to_row()`
 
+<br/>
 **htb_enqueue()--->htb_activate()--->htb_activate_prios()--->htb_add_to_id_tree()**
 
 ```
 htb_enqueue()
 	-> htb_activate()
 		-> htb_activate_prios()
-			-> htb_add_to_id_tree()
+			//当class是yellow
+			-> htb_add_to_id_tree(p->un.inner.feed + prio, cl, prio)
 			-> htb_add_class_to_row()
 ```
 
 ```c
+/** 
+ * htb_add_to_id_tree - 将class添加到父class的inner feed中 
+ * 
+ * Routine 将class添加到根据classid存储的list中（实际上是一棵树）
+ * 确保给定优先级的class之前没有存储在该list中 
+ * @root: 传入的是p->un.inner.feed + prio，inner.feed是rb_boot数组，struct rb_root feed[TC_HTB_NUMPRIO]，
+ * +prio表示获得prio优先级对应的feed[]数组元素
+ * @cl: 要加入rb数的子节点
+ * @prio: 子节点的优先级
+ */  
+static void htb_add_to_id_tree(struct rb_root *root,
+			       struct htb_class *cl, int prio)
+{
+	struct rb_node **p = &root->rb_node, *parent = NULL;
+	// RB树是有序表, 根据类别ID排序, 值大的到右节点, 小的到左节点
+	// 循环, 查找树中合适的位置插入类别节点cl
+	while (*p) {
+		struct htb_class *c;
+		parent = *p;
+		c = rb_entry(parent, struct htb_class, node[prio]);
+
+		if (cl->classid > c->classid)
+			p = &parent->rb_right;
+		else
+			p = &parent->rb_left;
+	}
+	// 进行RB树的插入操作, RB树标准函数操作
+	rb_link_node(&cl->node[prio], parent, p);
+	rb_insert_color(&cl->node[prio], root);
+}
+```
+
+接着来到`htb_add_class_to_row()`
+
+**htb_enqueue()--->htb_activate()--->htb_activate_prios()--->htb_add_class_to_row()**
 
 ```
+htb_enqueue()
+	-> htb_activate()
+		-> htb_activate_prios()
+			
+			-> htb_add_to_id_tree()
+			//当class是green
+			-> htb_add_class_to_row(q, cl, mask)
+```
+
+```c
+/** 
+ * htb_add_class_to_row - 将class添加到它所在level的self feed 
+ * 
+ * 根据优先级掩码，将class添加到它所在level的row，即self feed 
+ * 如果mask==0,将什么也不做
+ */ 
+static inline void htb_add_class_to_row(struct htb_sched *q,
+					struct htb_class *cl, int mask)
+{
+	//htb_sched的row_mask表示该层的哪些优先权值的树有效
+	// 将cl层次对应的ROW的row_mask或上新的mask, 表示有对应prio的数据了 
+	q->row_mask[cl->level] |= mask;
+	// 循环mask, 将cl插入mask每一位对应的prio的树中 
+	while (mask) {
+		// prio是mask中最低为1的位的位置 
+		int prio = ffz(~mask);
+		// 清除该位
+		mask &= ~(1 << prio);
+		// 添加到具体的RB树中，即cl所在层次的self feed对应优先级的RB树
+		htb_add_to_id_tree(q->row[cl->level] + prio, cl, prio);
+	}
+}
+```
+
+
 
 
 **5.2 出队**
@@ -412,21 +486,21 @@ HTB的出队是个非常复杂的处理过程, 函数调用过程为:
 
 ```
 htb_dequeue  
-  -> __skb_dequeue  
-  -> htb_do_events  
-    -> htb_safe_rb_erase  
-    -> htb_change_class_mode  
-    -> htb_add_to_wait_tree  
-  -> htb_dequeue_tree  
-    -> htb_lookup_leaf  
-    -> htb_deactivate  
-    -> q->dequeue  
-    -> htb_next_rb_node  
-    -> htb_charge_class  
-      -> htb_change_class_mode  
-      -> htb_safe_rb_erase  
-      -> htb_add_to_wait_tree  
-  -> htb_delay_by 
+	-> __skb_dequeue  
+	-> htb_do_events  
+		-> htb_safe_rb_erase  
+		-> htb_change_class_mode  
+		-> htb_add_to_wait_tree  
+	-> htb_dequeue_tree  
+		-> htb_lookup_leaf  
+		-> htb_deactivate  
+		-> q->dequeue  
+		-> htb_next_rb_node  
+		-> htb_charge_class  
+			-> htb_change_class_mode  
+			-> htb_safe_rb_erase  
+			-> htb_add_to_wait_tree  
+	-> htb_delay_by 
 ```
 
 ```c
