@@ -229,6 +229,12 @@ tc qdisc add dev eth0 parent 1:12 handle 40: sfq perturb 10
 
 **5.1 入队**
 
+**htb_enqueue()**
+
+```
+htb_enqueue()
+```
+
 ```c
 static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)  
 {
@@ -290,7 +296,12 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 接下来再看看`htb_activate(q, cl);`。
 
-**htb_activate()**
+**htb_enqueue()--->htb_activate()**
+
+```
+htb_enqueue()
+	->htb_activate()
+```
 
 ```c
 /** 
@@ -319,7 +330,13 @@ static inline void htb_activate(struct htb_sched *q, struct htb_class *cl)
 
 接下来再到`htb_activate_prios(q, cl);`。
 
-**htb_activate_prios()**
+**htb_enqueue()--->htb_activate()--->htb_activate_prios()**
+
+```
+htb_enqueue()
+	-> htb_activate()
+		-> htb_activate_prios()
+```
 
 ```c
 /** 
@@ -353,20 +370,39 @@ static void htb_activate_prios(struct htb_sched *q, struct htb_class *cl)
 				/* parent already has its feed in use so that
 				   reset bit in mask as parent is already ok */
 				mask &= ~(1 << prio);
-			// 将该类别加到父节点的prio优先权提供数据包的节点树中
+			// 将该类别加到父节点的prio优先权提供数据包的节点树中，
+			// 即由于子class是yellow，所以将其按优先级添加到父class的inner feed中
 			htb_add_to_id_tree(p->un.inner.feed + prio, cl, prio);
 		}
 		// 父节点的prio_activity或上mask中的置1位, 某位为1表示该位对应的优先权的数据可用
+		// 表示inner feed中与该子class的连线
 		p->prio_activity |= mask;
-		cl = p;
 		// 循环到上一层, 当前类别更新父节点, 父节点更新为祖父节点 
+		// 如果父节点也变yellow，需要将父节点也添加到祖父节点的inner feed中
+		cl = p;
 		p = cl->parent;
 	}
-	// 如果cl是HTB_CAN_SEND模式, 将该类别添加到合适的ROW中
+	// 如果cl是HTB_CAN_SEND模式, 将该类别添加到合适的ROW（self feed）中
 	// 此时的cl可能已经不是原来的cl了,而是原cl的长辈节点了
 	if (cl->cmode == HTB_CAN_SEND && mask)
 		htb_add_class_to_row(q, cl, mask);
 }
+```
+
+接下来需要分别看`htb_add_to_id_tree()`和`htb_add_class_to_row()`
+
+**htb_enqueue()--->htb_activate()--->htb_activate_prios()--->htb_add_to_id_tree()**
+
+```
+htb_enqueue()
+	-> htb_activate()
+		-> htb_activate_prios()
+			-> htb_add_to_id_tree()
+			-> htb_add_class_to_row()
+```
+
+```c
+
 ```
 
 
