@@ -232,7 +232,7 @@ tc qdisc add dev eth0 parent 1:12 handle 40: sfq perturb 10
 **htb_enqueue()**
 
 ```
-htb_enqueue()
+htb_enqueue() <-----
 ```
 
 ```c
@@ -301,7 +301,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 ```
 htb_enqueue()
-	-> htb_activate(q, cl)
+	-> htb_activate(q, cl) <-----
 ```
 
 ```c
@@ -337,7 +337,7 @@ static inline void htb_activate(struct htb_sched *q, struct htb_class *cl)
 ```
 htb_enqueue()
 	-> htb_activate()
-		-> htb_activate_prios(q, cl)
+		-> htb_activate_prios(q, cl) <-----
 ```
 
 ```c
@@ -401,7 +401,7 @@ htb_enqueue()
 	-> htb_activate()
 		-> htb_activate_prios()
 			//当class是yellow
-			-> htb_add_to_id_tree(p->un.inner.feed + prio, cl, prio)
+			-> htb_add_to_id_tree(p->un.inner.feed + prio, cl, prio) <-----
 			-> htb_add_class_to_row()
 ```
 
@@ -440,16 +440,16 @@ static void htb_add_to_id_tree(struct rb_root *root,
 
 接着来到`htb_add_class_to_row()`
 
+<br/>
 **htb_enqueue()--->htb_activate()--->htb_activate_prios()--->htb_add_class_to_row()**
 
 ```
 htb_enqueue()
 	-> htb_activate()
 		-> htb_activate_prios()
-			
 			-> htb_add_to_id_tree()
 			//当class是green
-			-> htb_add_class_to_row(q, cl, mask)
+			-> htb_add_class_to_row(q, cl, mask) <-----
 ```
 
 ```c
@@ -477,15 +477,22 @@ static inline void htb_add_class_to_row(struct htb_sched *q,
 }
 ```
 
+<br/>
+**入队操作总结**
 
+* 1.判断数据包类型：a.drop，b.直接发送，c.添加到叶子节点。以下只分享添加到叶子节点的类型
+* 2.将数据包添加到叶子节点的流控结构体如pfifo
+* 3.调用`htb_activate`激活HTB类别，建立该类别的数据提供数，这样dequeue时可以从中取数据包
+* 4.获取叶子节点的优先级，调用`htb_activate_prios`进行实际的激活操作
+* 5.`htb_activate_prios`中分两类进行：a.对于yellow类型的class，将其添加到父class的feed（inner feed）中，b.对于green类型的class，将其添加到class所在level的row（self feed）中。
 
-
+<br/>
 **5.2 出队**
 
 HTB的出队是个非常复杂的处理过程, 函数调用过程为:
 
 ```
-htb_dequeue  
+htb_dequeue <-----
 	-> __skb_dequeue  
 	-> htb_do_events  
 		-> htb_safe_rb_erase  
@@ -503,6 +510,9 @@ htb_dequeue
 	-> htb_delay_by 
 ```
 
+<br/>
+**htb_dequeue()**
+
 ```c
 static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 {
@@ -513,13 +523,13 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 	long min_delay;
 	// 保存当前时间滴答数
 	q->jiffies = jiffies;
-
 	/* try to dequeue direct packets as high prio (!) to minimize cpu work */
-	// 先从当前直接发送队列取数据包, 直接发送队列中的数据有最高优先级, 可以说没有流量限制
+	// 先从当前直接发送队列取数据包, 直接发送队列中的数据有最高优先级, 可以说没有流量限制 
 	skb = __skb_dequeue(&q->direct_queue);
 	if (skb != NULL) {
-	// 取到数据包, 更新参数, 非阻塞, 返回数据包
+		// 从直接发送队列中取到数据包, 更新参数, 非阻塞, 返回数据包  
 		sch->flags &= ~TCQ_F_THROTTLED;
+		//sch->q 数据包链表头
 		sch->q.qlen--;
 		return skb;
 	}
@@ -528,44 +538,47 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 		goto fin;
 	// 获取当前有效时间值
 	PSCHED_GET_TIME(q->now);
-	// 最小延迟值初始化为最大整数 
+	// 最小延迟值初始化为最大整数
 	min_delay = LONG_MAX;
 	q->nwc_hit = 0;
-	// 遍历树的所有层次, 从叶子节点开始
+	// 遍历节点树（静态）的所有层次, 从叶子节点开始
 	for (level = 0; level < TC_HTB_MAXDEPTH; level++) {
 		/* common case optimization - skip event handler quickly */
 		int m;
 		long delay;
-		// 计算延迟值, 是取数据包失败的情况下更新HTB定时器的延迟时间
+		// 计算延迟值, 是取数据包失败的情况下更新HTB定时器的延迟时间 
 		// 比较ROW树中该层节点最近的事件定时时间是否已经到了
 		if (time_after_eq(q->jiffies, q->near_ev_cache[level])) {
-			// 时间到了, 处理HTB事件, 返回值是下一个事件的延迟时间 
+			// 时间到了, 处理HTB事件, 返回值是下一个事件的延迟时间
+			//对第level号等待树的类别节点进行模式调整，即white slot里面的class，一会再详细看
 			delay = htb_do_events(q, level);
-			// 更新本层最近定时时间
+			// 更新本层最近定时时间,HZ表示1秒钟
 			q->near_ev_cache[level] =
 			    q->jiffies + (delay ? delay : HZ);
 		} else
 			// 时间还没到, 计算两者时间差
 			delay = q->near_ev_cache[level] - q->jiffies;
-			// 更新最小延迟值, 注意这是在循环里面进行更新的, 循环找出最小的延迟时间
-			if (delay && min_delay > delay)
-				min_delay = delay;
-			// 该层次的row_mask取反, 实际是为找到row_mask[level]中为1的位, 为1表示该树有数据包可用
-			m = ~q->row_mask[level];
-			while (m != (int)(-1)) {
+		// 更新最小延迟值, 注意这是在循环里面进行更新的, 循环找出最小的延迟时间
+		if (delay && min_delay > delay)
+			min_delay = delay;
+		// 该层次的row_mask取反, 实际是为找到row_mask[level]中为1的位, 为1表示该树有数据包可用
+		m = ~q->row_mask[level];
+		while (m != (int)(-1)) {
 			// m的数据位中第一个0位的位置作为优先级值, 从低位开始找, 也就是prio越小, 实际数据的优先权越大, 越先出队
-				int prio = ffz(m);
-				m |= 1 << prio;
-				skb = htb_dequeue_tree(q, prio, level);
-				if (likely(skb != NULL)) {
-					// 数据包出队成功, 更新参数, 退出循环, 返回数据包	
-					sch->q.qlen--;
-					// 取数据包成功就要去掉流控节点的阻塞标志
-					sch->flags &= ~TCQ_F_THROTTLED;
-					goto fin;
-				}
+			int prio = ffz(m);
+			// 将该0位设置为1, 也就是清除该位
+			m |= 1 << prio;
+			// 从该优先权值的流控树中进行出队操作
+			skb = htb_dequeue_tree(q, prio, level);
+			if (likely(skb != NULL)) {
+				// 数据包出队成功, 更新参数, 退出循环, 返回数据包
+				// 取数据包成功就要去掉流控节点的阻塞标志
+				sch->q.qlen--;
+				sch->flags &= ~TCQ_F_THROTTLED;
+				goto fin;
 			}
 		}
+	}
 	// 循环结束也没取到数据包, 队列长度非0却不能取出数据包, 表示流控节点阻塞
 	// 进行阻塞处理, 调整HTB定时器, 最大延迟5秒
 	htb_delay_by(sch, min_delay > 5 * HZ ? 5 * HZ : min_delay);
@@ -574,6 +587,104 @@ fin:
 }
 ```
 
+接下来需要分别看`htb_do_events()`、`htb_dequeue_tree()`和`htb_delay_by()`。
+
+首先是`htb_do_events()`
+
+<br/>
+**htb_dequeue()--->htb_do_events()**
+
+```
+htb_dequeue 
+	-> __skb_dequeue  
+	-> htb_do_events(q, level) <-----
+		-> htb_safe_rb_erase  
+		-> htb_change_class_mode  
+		-> htb_add_to_wait_tree  
+	-> htb_dequeue_tree  
+		-> htb_lookup_leaf  
+		-> htb_deactivate  
+		-> q->dequeue  
+		-> htb_next_rb_node  
+		-> htb_charge_class  
+			-> htb_change_class_mode  
+			-> htb_safe_rb_erase  
+			-> htb_add_to_wait_tree  
+	-> htb_delay_by 
+```
+
+```c
+/** 
+ * htb_do_events - 对第level号等待树的类别节点进行模式调整 
+ * 
+ * 扫描event队列,发现pending event然后应用它们。
+ * 返回下一个pending event的时间jiffies，如果pq没有event，则返回0
+ */  
+//  
+static long htb_do_events(struct htb_sched *q, int level)
+{
+	int i;
+	// 循环500次, 为什么是500? 表示树里最多有500个节点? 对应500个事件
+	for (i = 0; i < 500; i++) {
+		struct htb_class *cl;
+		long diff;
+		//q->wait_pq[]：等待队列，用来挂载哪些带宽超出限制的节点
+		// 取等待rb树第一个节点, 每次循环都从树中删除一个节点  
+		struct rb_node *p = rb_first(&q->wait_pq[level]);
+		// 没节点, 事件空, 返回0表示没延迟
+		if (!p)
+			return 0;
+		// 获取该节点对应的HTB类别
+		cl = rb_entry(p, struct htb_class, pq_node);
+		// 该类别延迟处理时间是在当前时间后面, 返回时间差作为延迟值
+		if (time_after(cl->pq_key, q->jiffies)) {
+			return cl->pq_key - q->jiffies;
+		}
+		// 时间小于当前时间了, 已经超时了
+		// 安全地将该节点p从等待RB树中断开
+		htb_safe_rb_erase(p, q->wait_pq + level);
+		// 当前时间和检查点时间的差值
+		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32) cl->mbuffer);
+		// 根据时间差值更改该类别模式
+		htb_change_class_mode(q, cl, &diff);
+		// 如果不是可发送模式, 重新插入回等待树 
+		if (cl->cmode != HTB_CAN_SEND)
+			htb_add_to_wait_tree(q, cl, diff);
+	}
+	// 超过500个事件
+	if (net_ratelimit())
+		printk(KERN_WARNING "htb: too many events !\n");
+	// 返回0.1秒的延迟 
+	return HZ / 10;
+}
+```
+
+接着再来看看`htb_change_class_mode()`
+
+<br/>
+**htb_dequeue()--->htb_do_events()--->htb_change_class_mode()**
+
+```
+htb_dequeue 
+	-> __skb_dequeue  
+	-> htb_do_events(q, level) 
+		-> htb_safe_rb_erase  
+		-> htb_change_class_mode(q, cl, &diff) <-----
+		-> htb_add_to_wait_tree  
+	-> htb_dequeue_tree  
+		-> htb_lookup_leaf  
+		-> htb_deactivate  
+		-> q->dequeue  
+		-> htb_next_rb_node  
+		-> htb_charge_class  
+			-> htb_change_class_mode  
+			-> htb_safe_rb_erase  
+			-> htb_add_to_wait_tree  
+	-> htb_delay_by 
+```
+
+
+<br/>
 **5.3 其他操作（不详细介绍）**
 
 * `htb_requeue`:重入队
@@ -598,4 +709,5 @@ HTB的流控就体现在通过令牌变化情况计算类别节点的模式, 如
 * *[ux内核中流量控制(11)](http://cxw06023273.iteye.com/blog/867337)*
 * *[ux内核中流量控制(12)](http://cxw06023273.iteye.com/blog/867338)*
 * *[ux内核中流量控制(13)](http://cxw06023273.iteye.com/blog/867339)*
+* *[对linux内核中jiffies+Hz表示一秒钟的理解](http://blog.csdn.net/u012160436/article/details/45530621)*
 
