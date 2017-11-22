@@ -325,10 +325,48 @@ static inline void htb_activate(struct htb_sched *q, struct htb_class *cl)
 /** 
  * htb_activate_prios - 创建active class的feed chain 
  * 
- * The class is connected to ancestors and/or appropriate rows 
- * for priorities it is participating on. cl->cmode must be new 
- * (activated) mode. It does nothing if cl->prio_activity == 0. 
+ * 这里的class必须是根据优先级连接到祖先节点的inner self或者合适的rows（self feed）。
+ * cl->cmode必须是new (activated) mode。
+ * 如果cl->prio_activity == 0,就是一个空函数， 不过从前面看prio_activity似乎是不会为0的
+ * 激活操作, 建立数据提供树
  */  
+static void htb_activate_prios(struct htb_sched *q, struct htb_class *cl)
+{	
+	// 父节点
+	struct htb_class *p = cl->parent;
+	// prio_activity是作为一个掩码, 应该只有一位为1
+	long m, mask = cl->prio_activity;
+	// 在当前模式是HTB_MAY_BORROW情况下进入循环, 某些情况下这些类别是可以激活的
+	// 绝大多数情况p和mask的初始值应该都是非0值
+	while (cl->cmode == HTB_MAY_BORROW && p && mask) {
+		// 备份mask值
+		m = mask;
+		while (m) {
+			// 掩码取反, 找第一个0位的位置（从0开始计数）, 也就是原来最低为1的位的位置
+			// prio越小, 等级越高, 取数据包也是先从prio值小的节点取
+			int prio = ffz(~m);
+			// 清除该位
+			m &= ~(1 << prio);
+			// p是父节点, 所以inner结构肯定有效, 不会使用leaf结构的
+			// 如果父节点的prio优先权的数据包的提供树已经存在, 在掩码中去掉该位
+			if (p->un.inner.feed[prio].rb_node)
+				/* parent already has its feed in use so that
+				   reset bit in mask as parent is already ok */
+				mask &= ~(1 << prio);
+			// 将该类别加到父节点的prio优先权提供数据包的节点树中
+			htb_add_to_id_tree(p->un.inner.feed + prio, cl, prio);
+		}
+		// 父节点的prio_activity或上mask中的置1位, 某位为1表示该位对应的优先权的数据可用
+		p->prio_activity |= mask;
+		cl = p;
+		// 循环到上一层, 当前类别更新父节点, 父节点更新为祖父节点 
+		p = cl->parent;
+	}
+	// 如果cl是HTB_CAN_SEND模式, 将该类别添加到合适的ROW中
+	// 此时的cl可能已经不是原来的cl了,而是原cl的长辈节点了
+	if (cl->cmode == HTB_CAN_SEND && mask)
+		htb_add_class_to_row(q, cl, mask);
+}
 ```
 
 
