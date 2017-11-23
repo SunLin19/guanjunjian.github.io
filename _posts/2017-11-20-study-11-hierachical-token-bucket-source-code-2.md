@@ -43,6 +43,11 @@ HTB**运行过程中**会将不同类别不同优先权的数据包进行有序�
   
 关于红黑树的数据结构和操作在include/linux/rbtree.h和lib/rbtree.c中定义.
 
+对于HTB的原理理解，可以参考
+* 1.[Linux TC(Traffic Control) 简介](https://yq.aliyun.com/articles/4000)
+* 2.[linux网络流控-htb算法简析](https://www.cnblogs.com/acool/p/7779159.html)
+* 3.[分层令牌桶原理](https://guanjunjian.github.io/2017/11/16/study-9-hierachical-token-bucket-theory/)
+
 ## 2. HTB操作结构定义
 
 * `htb_cmode`：HTB操作数据包模式。HTB_CAN_SEND，可以发送, 没有阻塞；HTB_CANT_SEND，阻塞，不能发生数据包；HTB_MAY_BORROW，阻塞，可以向其他类借带宽来发送
