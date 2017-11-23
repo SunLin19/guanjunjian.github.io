@@ -644,6 +644,9 @@ static long htb_do_events(struct htb_sched *q, int level)
 		// 安全地将该节点p从等待RB树中断开
 		htb_safe_rb_erase(p, q->wait_pq + level);
 		// 当前时间和检查点时间的差值
+		// 根据当前时间和上次流控计算时间的时间差来计算可用的令牌量
+		// 计算从上次发送数据包到现在的时间里生成的令牌数，然后把diff加上原先桶中的令牌数就为总的令牌数，当然总的
+令牌数是不能比桶大的
 		diff = PSCHED_TDIFF_SAFE(q->now, cl->t_c, (u32) cl->mbuffer);
 		// 根据时间差值更改该类别模式
 		htb_change_class_mode(q, cl, &diff);
@@ -683,6 +686,100 @@ htb_dequeue
 	-> htb_delay_by 
 ```
 
+```c
+/** 
+ * htb_change_class_mode - 调整类别节点的发送模式  
+ *  
+ * 这个函数应该是在正常情况下唯一的改变class发送模式的方法。R
+ * outine会更新self feed list连接关系，改变class的模式或将class添加到合适的wait event队列中。
+ *  新模式应该与旧模式不一样，而且如果改变后的模式不是HTB_CAN_SEND（看htb_add_to_wait_tree），那么cl->pq_key必须有效
+ */  
+static void
+htb_change_class_mode(struct htb_sched *q, struct htb_class *cl, long *diff)
+{	
+	// 根据变化值计算新模式
+	enum htb_cmode new_mode = htb_class_mode(cl, diff);
+	// 模式没变, 返回
+	if (new_mode == cl->cmode)
+		return;
+	// cl->prio_activity非0表示是活动的节点, 需要停止后再更新模式 
+	if (cl->prio_activity) {	/* not necessary: speed optimization */
+		// 如原来的模式为可发送数据, 先停该节点
+		if (cl->cmode != HTB_CANT_SEND)
+			htb_deactivate_prios(q, cl);
+		// 更新模式
+		cl->cmode = new_mode;
+		// 如果新模式不是禁止发送, 重新激活节点 
+		if (new_mode != HTB_CANT_SEND)
+			htb_activate_prios(q, cl);
+	} else
+		// 非活动类别节点, 直接更新模式值
+		cl->cmode = new_mode;
+}
+```
+
+接着继续看看`htb_class_mode()`。
+
+<br/>
+**htb_dequeue()--->htb_do_events()--->htb_change_class_mode()--->htb_class_mode()**
+
+```
+htb_dequeue 
+	-> __skb_dequeue  
+	-> htb_do_events(q, level) 
+		-> htb_safe_rb_erase  
+		-> htb_change_class_mode() 
+			-> htb_class_mode(cl, diff) <-----
+		-> htb_add_to_wait_tree  
+	-> htb_dequeue_tree  
+		-> htb_lookup_leaf  
+		-> htb_deactivate  
+		-> q->dequeue  
+		-> htb_next_rb_node  
+		-> htb_charge_class  
+			-> htb_change_class_mode  
+			-> htb_safe_rb_erase  
+			-> htb_add_to_wait_tree  
+	-> htb_delay_by 
+```
+
+```c
+/** 
+ * htb_class_mode - 计算并返回类节点的模式 
+ * 
+ * 该函数根据cl->tc+diff（tc为检查时间点）计算class的模式。如果模式不是HTB_CAN_SEND，那么cl->pq_key更新为现在时间和class改变状态时间的差
+ * class模式不是简单地改变 cl->{c,}tokens == 0，而是滞后地改为0..-cl->{c,}的缓存范围
+ * 这意味着限制单位时间内模式改变的次数，速度的增加大概是1/6
+ */
+static inline enum htb_cmode
+htb_class_mode(struct htb_class *cl, long *diff)
+{
+	long toks;
+	/* 计算类别的Ceil令牌，tokens表示当前令牌数，ctokens表示峰值令牌数
+	 * htb_lowater():如果cmode是HTB_CANT_SEND,返回0，否则返回 -cl->cbuffer
+     * 这里ctokens是租借模式下令牌数，经过一段时间后令牌数就会进行补充。
+     * 待补充后仍然小于低水位线，则状态变为HTB_CANT_SEND（不能进行发送），
+     * 这里htb_lowater低水位线根据当前类的模式不同而不同，如果当前类模式
+     * 为HTB_CANT_SEND，则低水位线的值为-cl->cbuffer，也
+     * 就是租借模式下单包最大可传达数据所需要的ticket，其它模块下低水位线的值为0
+     */
+	if ((toks = (cl->ctokens + *diff)) < htb_lowater(cl)) {
+		//返回还需要多少令牌
+		*diff = -toks;
+		// 如果令牌小于低限, 模式为不可发送
+		return HTB_CANT_SEND;
+	}
+	/* 计算类别的普通令牌
+	 * 如果令牌大于高限, 模式为可发送
+	 * htb_hiwater():如果cmode是HTB_CAN_SEND，返回-cl->buffer，否则0
+	 * 这里tokens是非租借模式下令牌数，经过一段时间补充后，如果高于高水位线，则状态变为HTB_CAN_SEND（可以发送）
+	if ((toks = (cl->tokens + *diff)) >= htb_hiwater(cl))
+		return HTB_CAN_SEND;
+	// 否则模式为可借，返回还需要多少令牌 
+	*diff = -toks;
+	return HTB_MAY_BORROW;
+}
+```
 
 <br/>
 **5.3 其他操作（不详细介绍）**
