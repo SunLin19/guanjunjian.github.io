@@ -48,6 +48,20 @@ HTB**运行过程中**会将不同类别不同优先权的数据包进行有序�
 * 2.[linux网络流控-htb算法简析](https://www.cnblogs.com/acool/p/7779159.html)
 * 3.[分层令牌桶原理](https://guanjunjian.github.io/2017/11/16/study-9-hierachical-token-bucket-theory/)
 
+总结来说，原理为：
+
+某个时刻每个类可以处于三种状态中的一种:
+
+* 1.CAN_SEND
+* 2.MAY_BORROW
+* 3.CANT_SEND
+
+决策哪个类出包算法：
+
+* 1.htb算法从类树的底部开始往上找CAN_SEND状态的class.如果找到某一层有CAN_SEND状态的类则停止.
+* 2.如果该层中有多个class处于CAN_SEND状态则选取优先级最高(priority最小)的class.如果最高优先级还是有多个class,那就在这些类中轮训处理.每个类每发送自己的quantum个字节后,轮到下一个类发送.
+* 3.上面有讲到只有leafclass才可以缓存网络包,innerclass是没有网络包的.如果步骤1,2最终选到了innerclass怎么处理？既然是innerclass,肯定有自己的subclass.innerclass会顺着树往下找,找到一个子孙leafclass.并且该leafclass处于MAY_BORROW状态,将自己富余的令牌借给该leafclass让其出包.同样的道理,可能会有多个子孙leafclass处于MAY_BORROW状态,这里的处理跟步骤2是一样的.
+
 ## 2. HTB操作结构定义
 
 * `htb_cmode`：HTB操作数据包模式。HTB_CAN_SEND，可以发送, 没有阻塞；HTB_CANT_SEND，阻塞，不能发生数据包；HTB_MAY_BORROW，阻塞，可以向其他类借带宽来发送
@@ -232,7 +246,7 @@ tc qdisc add dev eth0 parent 1:12 handle 40: sfq perturb 10
 <br/>
 以下仔细分析比较重要的函数。
 
-**5.1 入队**
+###5.1 入队
 
 **htb_enqueue()**
 
@@ -492,7 +506,7 @@ static inline void htb_add_class_to_row(struct htb_sched *q,
 * 5.`htb_activate_prios`中分两类进行：a.对于yellow类型的class，将其添加到父class的feed（inner feed）中，b.对于green类型的class，将其添加到class所在level的row（self feed）中。
 
 <br/>
-**5.2 出队**
+###5.2 出队
 
 HTB的出队是个非常复杂的处理过程, 函数调用过程为:
 
@@ -570,6 +584,7 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 		m = ~q->row_mask[level];
 		while (m != (int)(-1)) {
 			// m的数据位中第一个0位的位置作为优先级值, 从低位开始找, 也就是prio越小, 实际数据的优先权越大, 越先出队
+			// 找出同一层取优先级高的
 			int prio = ffz(m);
 			// 将该0位设置为1, 也就是清除该位
 			m |= 1 << prio;
@@ -592,9 +607,9 @@ fin:
 }
 ```
 
-接下来需要分别看`htb_do_events()`、`htb_dequeue_tree()`和`htb_delay_by()`。
+可以看到，`dequeue`主要分为三个部分，下面就从5.2.1、5.2.2和5.2.3分别来看`htb_do_events()`、`htb_dequeue_tree()`和`htb_delay_by()`。
 
-首先是`htb_do_events()`
+#### 5.2.1 htb_do_events
 
 <br/>
 **htb_dequeue()--->htb_do_events()**
@@ -607,14 +622,6 @@ htb_dequeue
 		-> htb_change_class_mode  
 		-> htb_add_to_wait_tree  
 	-> htb_dequeue_tree  
-		-> htb_lookup_leaf  
-		-> htb_deactivate  
-		-> q->dequeue  
-		-> htb_next_rb_node  
-		-> htb_charge_class  
-			-> htb_change_class_mode  
-			-> htb_safe_rb_erase  
-			-> htb_add_to_wait_tree  
 	-> htb_delay_by 
 ```
 
@@ -680,14 +687,6 @@ htb_dequeue
 		-> htb_change_class_mode(q, cl, &diff) <-----
 		-> htb_add_to_wait_tree  
 	-> htb_dequeue_tree  
-		-> htb_lookup_leaf  
-		-> htb_deactivate  
-		-> q->dequeue  
-		-> htb_next_rb_node  
-		-> htb_charge_class  
-			-> htb_change_class_mode  
-			-> htb_safe_rb_erase  
-			-> htb_add_to_wait_tree  
 	-> htb_delay_by 
 ```
 
@@ -737,14 +736,6 @@ htb_dequeue
 			-> htb_class_mode(cl, diff) <-----
 		-> htb_add_to_wait_tree  
 	-> htb_dequeue_tree  
-		-> htb_lookup_leaf  
-		-> htb_deactivate  
-		-> q->dequeue  
-		-> htb_next_rb_node  
-		-> htb_charge_class  
-			-> htb_change_class_mode  
-			-> htb_safe_rb_erase  
-			-> htb_add_to_wait_tree  
 	-> htb_delay_by 
 ```
 
@@ -786,6 +777,139 @@ htb_class_mode(struct htb_class *cl, long *diff)
 }
 ```
 
+下面重新回到`dequeue`主线，往下看，到了`htb_dequeue_tree`。
+
+#### 5.2.2 htb_dequeue_tree
+
+<br/>
+**htb_dequeue()--->htb_dequeue_tree()**
+
+```
+htb_dequeue 
+	-> __skb_dequeue  
+	-> htb_do_events  
+	-> htb_dequeue_tree <-----
+		-> htb_lookup_leaf  
+		-> htb_deactivate  
+		-> q->dequeue  
+		-> htb_next_rb_node  
+		-> htb_charge_class  
+	-> htb_delay_by 
+```
+
+```c
+/* 从指定层次和优先级的RB数节点中取数据包
+ * 只有在确定该level该优先级可以active时才调用该函数
+ */
+static struct sk_buff *htb_dequeue_tree(struct htb_sched *q, int prio,
+					int level)
+{
+	struct sk_buff *skb = NULL;
+	//cl用于循环中做temp，start是记录首个循环的节点，用来结束循环
+	struct htb_class *cl, *start;
+	/* look initial class up in the row 
+	 * 根据层次和优先权值查找起始类别节点
+	 * 找到该level 该priority下的一个leafclass
+	 * 如果这个节点是叶子节点，那么它必然是green的
+	 * 如果这个节点是inner class，那么它是green的，就会找它的子孙叶子节点，而这个叶子节点必然是yellow的，
+	 * 该inner class可以向它的子孙叶子节点“借”出带宽。
+     */
+	start = cl = htb_lookup_leaf(q->row[level] + prio, prio,
+				     q->ptr[level] + prio,
+				     q->last_ptr_id[level] + prio);
+
+	do {
+next:
+		BUG_TRAP(cl);
+		// 如果类别为空, 返回数据包为空
+		if (!cl)
+			return NULL;
+
+		/* 
+         * class队列可以是空的---如果叶子节点的qdisc在入队时就drop掉数据包
+         * 或者如果someone在上一次dequeue时候对叶子节点使用graft操作（）
+         * 如果遇到class队列为空，则deactivate或skip
+         * 如果队列长度为0, 队列空的情况, 可能性较小  
+         */
+		if (unlikely(cl->un.leaf.q->q.qlen == 0)) {
+			struct htb_class *next;
+			// 该类别队列中没数据包了, 停止该类别结构 
+			htb_deactivate(q, cl);
+
+			/* row/level might become empty */
+			// 掩码该位为0， 表示该层该prio的rb树为空, 没有数据提供树， 返回数据包为空
+			// 即该level的self feed的该prio为空
+			if ((q->row_mask[level] & (1 << prio)) == 0)
+				return NULL;
+			// 否则重新查找该层该优先权的RB树节点class，同层级同优先级可以有多个class
+			next = htb_lookup_leaf(q->row[level] + prio,
+					       prio, q->ptr[level] + prio,
+					       q->last_ptr_id[level] + prio);
+			// 从新找到的这个类别结构cl开始循环, 找队列非空的节点
+			if (cl == start)	/* fix start if we just deleted it */
+				start = next;
+			cl = next;
+			// 这个goto形成了大循环中的小循环, 找队列长度非空的类别节点
+			goto next;
+		}
+		// 以下是队列长度非空的情况, 运行该类别结构的内部流控节点的出队操作,
+		// 这主要看该节点使用那种流控算法了, 如tbf之类就可以实现流量限制
+		skb = cl->un.leaf.q->dequeue(cl->un.leaf.q);
+		// 取得数据包, 中断循环准备返回
+		if (likely(skb != NULL))
+			break;
+		// 没取得数据包, 打印警告信息, 该信息在循环中只打印一次 
+		if (!cl->warned) {
+			printk(KERN_WARNING
+			       "htb: class %X isn't work conserving ?!\n",
+			       cl->classid);
+			// 作为已经打印了警告信息的标志
+			cl->warned = 1;
+		}
+		// 取到空包计数增加, 表示从非工作类别中取数据包的异常情况次数
+		q->nwc_hit++;
+		/* 更新到下一个rb树节点，即查找下一个该层级该优先级的节点
+         * 如果现在level!=0，就说明进行dequeue_tree操作的是个inner class，那么cl就是这个inner class的子孙叶子节点，
+         * 所以传入的是cl父节点的inner class所在的rb数指针
+         * level=0则就是叶子节点，传入的是叶子节点所在rb树的指针
+         */
+		htb_next_rb_node((level ? cl->parent->un.inner.ptr : q->
+				  ptr[0]) + prio);
+		// 继续查找该层该优先权另一个class的RB树中找叶子类别节点, 循环
+		cl = htb_lookup_leaf(q->row[level] + prio, prio,
+				     q->ptr[level] + prio,
+				     q->last_ptr_id[level] + prio);
+
+	} while (cl != start);
+	// 找到数据包的情况, 可能性很大
+	if (likely(skb != NULL)) {
+		//deficit[level] 扣掉该包的byte数
+		// 计算赤字deficit, 减数据包长度, 而deficit是初始化为0的
+		if ((cl->un.leaf.deficit[level] -= skb->len) < 0) {
+			// 如果该类别节点的赤字为负, 增加一个定额量, 缺省是物理网卡的队列长度
+			cl->un.leaf.deficit[level] += cl->un.leaf.quantum;
+			//当deficit[level]<0时说明该类已经发送了quantum.需要发送同层级同优先级的下一个类了.
+			//同上，更新到下一个rb树节点，即查找下一个该层级该优先级的节点
+			htb_next_rb_node((level ? cl->parent->un.inner.ptr : q->
+					  ptr[0]) + prio);
+		}
+		// 如果赤字为正就不会进行RB数节点的更换 
+		/* this used to be after charge_class but this constelation
+		   gives us slightly better performance */
+		// 如果队列空了, 停止该类别 
+		if (!cl->un.leaf.q->q.qlen)
+			htb_deactivate(q, cl);
+		// 更新令牌.
+		// 处理该流控节点以及其所有父节点的令牌情况, 调整该类别的模式cmode 
+		htb_charge_class(q, cl, level, skb->len);
+	}
+	return skb;
+}
+```
+
+
+
+
 <br/>
 **5.3 其他操作（不详细介绍）**
 
@@ -812,4 +936,7 @@ HTB的流控就体现在通过令牌变化情况计算类别节点的模式, 如
 * *[ux内核中流量控制(12)](http://cxw06023273.iteye.com/blog/867338)*
 * *[ux内核中流量控制(13)](http://cxw06023273.iteye.com/blog/867339)*
 * *[对linux内核中jiffies+Hz表示一秒钟的理解](http://blog.csdn.net/u012160436/article/details/45530621)*
+* *[Linux TC(Traffic Control) 简介](https://yq.aliyun.com/articles/4000)*
+* *[linux网络流控-htb算法简析](https://www.cnblogs.com/acool/p/7779159.html)*
+* *[分层令牌桶原理](https://guanjunjian.github.io/2017/11/16/study-9-hierachical-token-bucket-theory/)*
 
