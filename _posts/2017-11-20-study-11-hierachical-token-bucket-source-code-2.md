@@ -246,7 +246,8 @@ tc qdisc add dev eth0 parent 1:12 handle 40: sfq perturb 10
 <br/>
 以下仔细分析比较重要的函数。
 
-###5.1 入队
+<br/>
+### 5.1 入队
 
 **htb_enqueue()**
 
@@ -506,7 +507,7 @@ static inline void htb_add_class_to_row(struct htb_sched *q,
 * 5.`htb_activate_prios`中分两类进行：a.对于yellow类型的class，将其添加到父class的feed（inner feed）中，b.对于green类型的class，将其添加到class所在level的row（self feed）中。
 
 <br/>
-###5.2 出队
+### 5.2 出队
 
 HTB的出队是个非常复杂的处理过程, 函数调用过程为:
 
@@ -907,6 +908,16 @@ next:
 }
 ```
 
+**总结htb_dequeue_tree**
+
+* 1.根据传入的层级和优先级获取class，调用`htb_lookup_leaf()`,如果是叶子节点就返回本身，如果是inner class则找到其子孙叶子节点
+* 2.如果以上获得的叶子节点没有数据，则停止该节点，并寻找下一个同层级同优先级的节点，知道找到一个数据包
+* 3.取出数据包，如果包不为空，则中断循环，获得数据包，否则进行4.
+* 4.在之前的节点树中都没找到数据包，则换一颗节点树，如果形参中传入的是inner class，则换一个同层级同优先级的inner class，获取它的叶子节点，否则就获得同层级同优先级的叶子节点
+* 5.一直循到1.,除非循环到重复的节点或者是找到了数据包，结束循环
+* 6.获得要发送的数据包，计算deficit赤字，如果deficit[level]<0时说明该类已经发送了quantum.需要发送同层级同优先级的下一个类
+* 7.如果队列空了, 停止该类别 
+* 8.处理该流控节点以及其所有父节点的令牌情况, 调整该类别的模式cmode
 
 
 
