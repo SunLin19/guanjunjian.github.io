@@ -919,7 +919,44 @@ next:
 * 7.如果队列空了, 停止该类别 
 * 8.处理该流控节点以及其所有父节点的令牌情况, 调整该类别的模式cmode
 
+#### 5.2.3 htb_delay_by
 
+<br/>
+**htb_dequeue()--->htb_delay_by()**
+
+```
+htb_dequeue 
+	-> __skb_dequeue  
+	-> htb_do_events  
+	-> htb_dequeue_tree  
+	-> htb_delay_by(sch, min_delay > 5 * HZ ? 5 * HZ : min_delay) <-----
+```
+
+```c
+//当htb_dequeue循环结束也没取到数据包, 队列长度非0却不能取出数据包, 表示流控节点阻塞  
+// 进行阻塞处理, 调整HTB定时器, 最大延迟5秒 
+// HTB延迟处理
+static void htb_delay_by(struct Qdisc *sch, long delay)
+{
+	struct htb_sched *q = qdisc_priv(sch);
+	// 延迟至少是1个时间片, 1/HZ秒  
+	if (delay <= 0)
+		delay = 1;
+	// 延迟最大是5秒
+	if (unlikely(delay > 5 * HZ)) {
+		if (net_ratelimit())
+			printk(KERN_INFO "HTB delay %ld > 5sec\n", delay);
+		delay = 5 * HZ;
+	}
+	/* why don't use jiffies here ? because expires can be in past */
+	// 修改定时器 
+	mod_timer(&q->timer, q->jiffies + delay);
+	// 设置阻塞标志
+	sch->flags |= TCQ_F_THROTTLED;
+	// 流量溢出统计增加 
+	sch->qstats.overlimits++;
+}
+```
 
 <br/>
 **5.3 其他操作（不详细介绍）**
