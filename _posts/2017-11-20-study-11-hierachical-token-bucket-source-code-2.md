@@ -582,6 +582,7 @@ static struct sk_buff *htb_dequeue(struct Qdisc *sch)
 		if (delay && min_delay > delay)
 			min_delay = delay;
 		// 该层次的row_mask取反, 实际是为找到row_mask[level]中为1的位, 为1表示该树有数据包可用
+		// row中的节点都是green，也就是CAN_SEND
 		m = ~q->row_mask[level];
 		while (m != (int)(-1)) {
 			// m的数据位中第一个0位的位置作为优先级值, 从低位开始找, 也就是prio越小, 实际数据的优先权越大, 越先出队
@@ -886,6 +887,10 @@ next:
 	if (likely(skb != NULL)) {
 		//deficit[level] 扣掉该包的byte数
 		// 计算赤字deficit, 减数据包长度, 而deficit是初始化为0的
+		//当出队一个数据包时,类对应的deficit[level]扣减包的byte数,
+		//当deficit[level]<0时说明该类已经发送了quantum.于是虽然再次给deficit[level]加了quantum,
+		//但是htb_next_rb_node((level ? cl->parent->un.inner.ptr : q->ptr[0]) + prio)已经将该
+		//层该优先级的出包类指针指向下一个类了.下发出包,将会出另一个类.
 		if ((cl->un.leaf.deficit[level] -= skb->len) < 0) {
 			// 如果该类别节点的赤字为负, 增加一个定额量, 缺省是物理网卡的队列长度
 			cl->un.leaf.deficit[level] += cl->un.leaf.quantum;
@@ -987,4 +992,5 @@ HTB的流控就体现在通过令牌变化情况计算类别节点的模式, 如
 * *[Linux TC(Traffic Control) 简介](https://yq.aliyun.com/articles/4000)*
 * *[linux网络流控-htb算法简析](https://www.cnblogs.com/acool/p/7779159.html)*
 * *[分层令牌桶原理](https://guanjunjian.github.io/2017/11/16/study-9-hierachical-token-bucket-theory/)*
+* *[HTB分层令牌桶排队规则分析](http://blog.csdn.net/liujianfeng1984/article/details/41922085)*
 
