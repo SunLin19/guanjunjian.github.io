@@ -17,11 +17,13 @@ tags:
 >
 > [Documentation/cgroups/net_cls.txt](https://www.mjmwired.net/kernel/Documentation/cgroups/net_cls.txt)的翻译。
 >
+> 基于内核4.3，文档生成时间 2015-11-02 12:44 EST。
+>
+ 
 
 
 
-
-## Network classifier cgroup
+## Network priority cgroup
 
 -----------------------------------
 
@@ -49,12 +51,14 @@ mkdir /sys/fs/cgroup/net_cls/0
 echo 0x100001 >  /sys/fs/cgroup/net_cls/0/net_cls.classid  		
 ```
 
+<br/>
 读取时会显示：
 ```
 cat /sys/fs/cgroup/net_cls/0/net_cls.classid
 1048577
 ```
 
+<br/>
 配置tc，使用tc创建一个基于classid 10：1的filter限制其速率为40mbit：
 
 ```
@@ -66,6 +70,7 @@ tc class add dev eth0 parent 10: classid 10:1 htb rate 40mbit
 tc filter add dev eth0 parent 10: protocol ip prio 10 handle 1: cgroup
 ```
 
+<br/>
 配置iptables，最基础的例子：
 
 ```
@@ -75,5 +80,5 @@ iptables -A OUTPUT -m cgroup ! --cgroup 0x100001 -j DROP
 
 ## 参考
 
-* *[Hierachical token bucket theory](http://luxik.cdi.cz/~devik/qos/htb/manual/theory.htm)*
+* *[Documentation/cgroups/net_cls.txt](https://www.mjmwired.net/kernel/Documentation/cgroups/net_cls.txt)*
 
