@@ -37,6 +37,7 @@ Control Groups为聚合/分区task集提供了一种机制，而且这些task的
 为了达到这一的目的，创建了一种新的cgroup子系统net_cls,该子系统可以让cgroup可以分辨数据包流量是从哪个cgroup中流出的。这是通过给cgroup分配一个classid实现的，classid可以被数据包分类器cls_cgroup使用，从而将数据包过滤到classid匹配的流量类型中，如下图1.所示。
 
 图1：
+
 ![](/img/study/study-14-cgroup-network-control-group/1-architecture.png)
 
 为了尽可能保持架构的简单和非侵入性，当数据包在网络栈中传递的时候，没有将classid存储在数据包中。数据包分类器使用数据包的进程上下文信息（process context information）来查找classid。这样做的缺点是：这种方法是适合在进程上下文中离开网络栈的数据包，例如，这种方法不适合内核生成的数据包（ACKs，ICMP replies等等）或者不适合于数据包在经过数据包分类器之前就进行了排队和重调度的数据包。
