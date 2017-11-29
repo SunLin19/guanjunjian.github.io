@@ -18,6 +18,8 @@ tags:
 > [Documentation/cgroups/net_cls.txt](https://www.mjmwired.net/kernel/Documentation/cgroups/net_cls.txt)的翻译。
 >
 > 基于内核4.3，文档生成时间 2015-11-02 12:44 EST。
+> 
+> 这个子系统使用等级识别符（classid）标记网络数据包，可允许 Linux 流量控制程序（tc）识别从具体 cgroup 中生成的数据包。
 >
  
 
@@ -81,4 +83,5 @@ iptables -A OUTPUT -m cgroup ! --cgroup 0x100001 -j DROP
 ## 参考
 
 * *[Documentation/cgroups/net_cls.txt](https://www.mjmwired.net/kernel/Documentation/cgroups/net_cls.txt)*
+* *[Cgroup相关介绍](http://www.aboutyun.com/thread-5891-1-1.html)*
 

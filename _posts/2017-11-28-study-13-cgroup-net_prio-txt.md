@@ -18,6 +18,8 @@ tags:
 > [Documentation/cgroups/net_prio.txt](https://www.mjmwired.net/kernel/Documentation/cgroups/net_prio.txt)的翻译。
 >
 > 基于内核4.3，文档生成时间 2015-11-02 12:44 EST。
+> 
+> 这个子系统提供了一种动态控制每个网卡流量优先级的功能
 >
 
 
@@ -50,7 +52,7 @@ Network priority cgroup提供了一个允许管理者动态设置由应用产生
 
 **2) net_prio.ifpriomap**
 
-该文件中包含一个map，该map是该cgroup中进程从各个网络接口向往流出流量的优先级映射。它包含了一系列以<ifname priority>形式的数组(tuples)。该文件的内容可以使用`echo <ifname priority>`进行修改。例如：
+该文件中包含一个map，该map是该cgroup中进程从各个网络接口向往流出流量的优先级映射。它包含了一系列以`<ifname priority>`形式的数组(tuples)。该文件的内容可以使用`echo <ifname priority>`进行修改。例如：
 
 ```
 echo "eth0 5" > /sys/fs/cgroups/net_prio/iscsi/net_prio.ifpriomap
@@ -68,4 +70,4 @@ net_prio的用处之一是，使用mqprio qdisc时，运行应用程序流量基
 ## 参考
 
 * *[Documentation/cgroups/net_prio.txt](https://www.mjmwired.net/kernel/Documentation/cgroups/net_prio.txt)*
-
+* *[Cgroup相关介绍](http://www.aboutyun.com/thread-5891-1-1.html)*
