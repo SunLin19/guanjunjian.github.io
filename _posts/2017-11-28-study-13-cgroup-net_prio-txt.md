@@ -52,7 +52,7 @@ Network priority cgroup提供了一个允许管理者动态设置由应用产生
 
 **2) net_prio.ifpriomap**
 
-该文件中包含一个map，该map是该cgroup中进程从各个网络接口向往流出流量的优先级映射。它包含了一系列以`<ifname priority>`形式的数组(tuples)。该文件的内容可以使用`echo <ifname priority>`进行修改。例如：
+该文件中包含一个map，该map是该cgroup中进程从各个网络接口向往流出流量的优先级映射。它包含了一系列以`<ifname priority>`形式的数组(tuples)。该文件的内容可以使用`echo <ifname priority>`(值越大优先级越低)进行修改。例如：
 
 ```
 echo "eth0 5" > /sys/fs/cgroups/net_prio/iscsi/net_prio.ifpriomap

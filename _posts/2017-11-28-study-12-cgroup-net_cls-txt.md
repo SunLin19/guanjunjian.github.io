@@ -39,7 +39,7 @@ TC可以使用这个标记来分配不同的优先级给不同的cgroup。Netfil
 当net_cls.classid中的值为0时，该文件无效。
 
 <br/>
-你可以写入十六进制的值到net_cls.classid文件中；这些值的格式为`0xAAAABBBB`；`AAAA`是主句柄号而`BBBB`是副句柄号。
+你可以写入十六进制的值到net_cls.classid文件中；这些值的格式为`0xAAAABBBB`；`AAAA`是主句柄号而`BBBB`是副句柄号。(如果没有就写0，并且0是可以省略的,0x10001=0x0000100001=0x1:1)
 读取net_cls.classid时会显示十进制结果。
 
 <br/>
