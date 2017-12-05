@@ -97,7 +97,7 @@ num   pkts bytes target     prot opt in     out     source               destina
 
 实验都是通过执行3次ping，获取iptables和etables的输出日志，得出结论。
 
-[输出日志](docker-bridge-network-demo-iptables-trace-log.txt)
+[输出日志](https://github.com/guanjunjian/guanjunjian.github.io/blob/master/img/study/study-15-docker-single-host-network-analysis/docker-bridge-network-demo-iptables-trace-log.txt)
 
 ## 2.Container to Container
 
