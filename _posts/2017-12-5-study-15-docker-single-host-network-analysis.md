@@ -131,6 +131,10 @@ TRACE: eb:nat:POSTROUTING
 TRACE: nat:POSTROUTING:policy:2 
 ```
 
+**数据流图-----图4.**
+![](/img/study/study-15-docker-single-host-network-analysis/4-container-to-container-ping-request.png)
+
+
 **2.2 ping response**
 
 **输出日志:**
@@ -148,7 +152,13 @@ TRACE: filter:FORWARD:rule:3
 TRACE: eb:nat:POSTROUTING
 ```
 
+**数据流图-----图5.**
+![](/img/study/study-15-docker-single-host-network-analysis/5-container-to-container-ping-response.png)
+
 ## 3.Local Process to Container
+
+Local Process to Container的拓扑图如图6.
+![](/img/study/study-15-docker-single-host-network-analysis/6-local-process-to-container-topology.png)
 
 **3.1 ping request**
 
@@ -169,6 +179,9 @@ TRACE: eb:filter:OUTPUT
 TRACE: eb:nat:POSTROUTING
 ```
 
+**数据流图-----图7.**
+![](/img/study/study-15-docker-single-host-network-analysis/7-local-process-to-container-ping-response.png)
+
 **3.2 ping response**
 
 **输出日志:**
@@ -183,7 +196,13 @@ TRACE: mangle:INPUT:policy:1
 TRACE: filter:INPUT:policy:1
 ```
 
+**数据流图-----图8.**
+![](/img/study/study-15-docker-single-host-network-analysis/8-local-process-to-container-ping-response.png)
+
 ## 4.Container to External
+
+Local Process to Container的拓扑图如图9.
+![](/img/study/study-15-docker-single-host-network-analysis/9-container-to-external-topology.png)
 
 **4.1 ping request**
 
@@ -206,6 +225,9 @@ TRACE: mangle:POSTROUTING:policy:1
 TRACE: nat:POSTROUTING:rule:1
 ```
 
+**数据流图-----图10.**
+![](/img/study/study-15-docker-single-host-network-analysis/10-container-to-external-ping-response.png)
+
 **4.2 ping response**
 
 **输出日志:**
@@ -225,7 +247,8 @@ TRACE: eb:filter:OUTPUT
 TRACE: eb:nat:POSTROUTING
 ```
 
-
+**数据流图-----图11.**
+![](/img/study/study-15-docker-single-host-network-analysis/11-container-to-external-ping-response.png)
 
 ## 参考
 
