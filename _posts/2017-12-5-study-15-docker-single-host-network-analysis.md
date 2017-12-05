@@ -22,7 +22,7 @@ tags:
 
 
 
-## 简介
+## 1.简介
 
 本文利用iptables和etables的日志，分析单机容器网络在`Container to Container`、`Local Process to Container`和`Container to External`三种场景下的数据包行走路径。
 
@@ -91,8 +91,41 @@ num   pkts bytes target     prot opt in     out     source               destina
 
 根据[参考2]和[参考3]对iptables中的一些细节进行分析：
 
-* 1.对于filter表自定义链[参考2]`DOCKER-USER`、`DOCKER-ISOLATION`和`DOCKER`，会在filter表FORWARD链的规则1规则2和规则4match之后，跳转到这些自定义链中进入处理，再仔细看`DOCKER-USER`和`DOCKER-ISOLATION`的target都为`RETURN`，表示从该子链中跳回到触发该子链的父链规则中，从触发的父链规则继续匹配下一条规则[参考4]。
-* 2.
+* 1.对于filter表自定义链[参考2]`DOCKER-USER`、`DOCKER-ISOLATION`和`DOCKER`，会在filter表FORWARD链的规则1规则2和规则4match之后，跳转到这些自定义链中进入处理，再仔细看`DOCKER-USER`和`DOCKER-ISOLATION`的target都为`RETURN`，表示从该子链中跳回到触发该子链的父链规则中，从触发的父链规则继续匹配下一条规则[参考4],之后可以在日志中看到具体的表现。
+* 2.filter表FORWARD链中的num 3，表示从其他接口发往docker0（就是发往container）的报文，只有RELATED和ESTABLISHED状态能通过。（比如ftp的关联链接，container主动建链的TCP链接。外部是不能主动跟container内部的服务建链的。）,num 5和num 6表示从docker0发往其他端口的报文都能通过。[参考4]
+* 3.在nat表中，PREROUTING链num 1和OUTPUT链num 1表示在收发两端，查找route之前，如果报文地址类型是local，就会送到DOCKER chain处理。在POSTROUTING链num 1表示从container往host外发（不是container之间）的报文，都会将报文原地址改为外发接口地址发出去。这样在container访问host外部网络时，外部看到的其实只是host地址，看不到container的私有地址。[参考4]
+
+实验都是通过执行3次ping，获取iptables和etables的输出日志，得出结论。
+
+[输出日志](docker-bridge-network-demo-iptables-trace-log.txt)
+
+## 2.Container to Container
+
+Container to Container的拓扑图如图3.
+
+<br/>
+**图3.**
+![](/img/study/study-15-docker-single-host-network-analysis/3-container-to-container-topology.png)
+
+### 2.1 ping request
+
+
+
+### 2.2 ping response
+
+## 3.Local Process to Container
+
+### 3.1 ping request
+
+### 3.2 ping response
+
+## 4.Container to External
+
+### 4.1 ping request
+
+### 4.2 ping response
+
+
 
 
 
