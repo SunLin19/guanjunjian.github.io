@@ -99,6 +99,9 @@ num   pkts bytes target     prot opt in     out     source               destina
 
 [输出日志](https://github.com/guanjunjian/guanjunjian.github.io/blob/master/img/study/study-15-docker-single-host-network-analysis/docker-bridge-network-demo-iptables-trace-log.txt)
 
+Trace target在数据包match table、chains的policy或rules时会输出日志，日志格式：”TRACE:tablename:chainname:type:rulenum”。当匹配到的是普通rules时，type=”rule”;当碰到一个user-defined chain的return target时，type=”return”；当匹配到built-in chain(比如：PREROUTING、INPUT、OUTPUT、FORWARD和POSTROUTING)的default policy时，type=”policy”。[参考1]
+
+
 ## 2.Container to Container
 
 Container to Container的拓扑图如图3.
@@ -109,23 +112,118 @@ Container to Container的拓扑图如图3.
 
 **2.1 ping request**
 
+**输出日志:**(只展示hit的iptables或etables规则，下同)
 
+```
+TRACE: eb:broute:BROUTING
+TRACE: eb:nat:PREROUTING
+TRACE: raw:PREROUTING:policy:2
+TRACE: nat:PREROUTING:policy:2
+TRACE: eb:filter:FORWARD
+TRACE: filter:FORWARD:rule:1
+TRACE: filter:DOCKER-USER:return:1
+TRACE: filter:FORWARD:rule:2
+TRACE: filter:DOCKER-ISOLATION:return:1
+TRACE: filter:FORWARD:rule:4
+TRACE: filter:DOCKER:return:1
+TRACE: filter:FORWARD:rule:6
+TRACE: eb:nat:POSTROUTING
+TRACE: nat:POSTROUTING:policy:2 
+```
 
 **2.2 ping response**
+
+**输出日志:**
+
+```
+TRACE: eb:broute:BROUTING
+TRACE: eb:nat:PREROUTING
+TRACE: raw:PREROUTING:policy:2
+TRACE: eb:filter:FORWARD
+TRACE: filter:FORWARD:rule:1
+TRACE: filter:DOCKER-USER:return:1
+TRACE: filter:FORWARD:rule:2
+TRACE: filter:DOCKER-ISOLATION:return:1
+TRACE: filter:FORWARD:rule:3
+TRACE: eb:nat:POSTROUTING
+```
 
 ## 3.Local Process to Container
 
 **3.1 ping request**
 
+**输出日志:**
+
+```
+TRACE: raw:OUTPUT:policy:2
+TRACE: mangle:OUTPUT:policy:1
+TRACE: nat:OUTPUT:policy:2
+TRACE: filter:OUTPUT:policy:1
+TRACE: mangle:POSTROUTING:policy:1
+TRACE: nat:POSTROUTING:policy:2
+TRACE: eb:nat:OUTPUT
+TRACE: eb:filter:OUTPUT
+TRACE: eb:nat:POSTROUTING
+TRACE: eb:nat:OUTPUT
+TRACE: eb:filter:OUTPUT
+TRACE: eb:nat:POSTROUTING
+```
+
 **3.2 ping response**
+
+**输出日志:**
+
+```
+TRACE: eb:broute:BROUTING
+TRACE: eb:nat:PREROUTING
+TRACE: raw:PREROUTING:policy:2
+TRACE: mangle:PREROUTING:policy:1
+TRACE: eb:filter:INPUT
+TRACE: mangle:INPUT:policy:1
+TRACE: filter:INPUT:policy:1
+```
 
 ## 4.Container to External
 
 **4.1 ping request**
 
+**输出日志:**
+
+```
+TRACE: eb:broute:BROUTING
+TRACE: eb:nat:PREROUTING
+TRACE: raw:PREROUTING:policy:2
+TRACE: mangle:PREROUTING:policy:1
+TRACE: nat:PREROUTING:policy:2
+TRACE: eb:filter:INPUT
+TRACE: mangle:FORWARD:policy:1
+TRACE: filter:FORWARD:rule:1
+TRACE: filter:DOCKER-USER:return:1
+TRACE: filter:FORWARD:rule:2
+TRACE: filter:DOCKER-ISOLATION:return:1
+TRACE: filter:FORWARD:rule:5
+TRACE: mangle:POSTROUTING:policy:1
+TRACE: nat:POSTROUTING:rule:1
+```
+
 **4.2 ping response**
 
+**输出日志:**
 
+```
+TRACE: raw:PREROUTING:policy:2
+TRACE: mangle:PREROUTING:policy:1
+TRACE: mangle:FORWARD:policy:1
+TRACE: filter:FORWARD:rule:1
+TRACE: filter:DOCKER-USER:return:1
+TRACE: filter:FORWARD:rule:2
+TRACE: filter:DOCKER-ISOLATION:return:1
+TRACE: filter:FORWARD:rule:3
+TRACE: mangle:POSTROUTING:policy:1
+TRACE: eb:nat:OUTPUT
+TRACE: eb:filter:OUTPUT
+TRACE: eb:nat:POSTROUTING
+```
 
 
 
