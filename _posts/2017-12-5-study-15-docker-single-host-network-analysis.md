@@ -97,6 +97,7 @@ num   pkts bytes target     prot opt in     out     source               destina
 
 实验都是通过执行3次ping，获取iptables和etables的输出日志，得出结论。
 
+<br/>
 [输出日志](https://github.com/guanjunjian/guanjunjian.github.io/blob/master/img/study/study-15-docker-single-host-network-analysis/docker-bridge-network-demo-iptables-trace-log.txt)
 
 Trace target在数据包match table、chains的policy或rules时会输出日志，日志格式：”TRACE:tablename:chainname:type:rulenum”。当匹配到的是普通rules时，type=”rule”;当碰到一个user-defined chain的return target时，type=”return”；当匹配到built-in chain(比如：PREROUTING、INPUT、OUTPUT、FORWARD和POSTROUTING)的default policy时，type=”policy”。[参考1]
@@ -154,6 +155,8 @@ TRACE: eb:nat:POSTROUTING
 
 **数据流图-----图5.**
 ![](/img/study/study-15-docker-single-host-network-analysis/5-container-to-container-ping-response.png)
+
+ping response中，对比ping request，没有了iptable的nat:PREROUTING和nat:POSTROUTING,是由于iptables就是如此设计。iptables会跟踪connection的state，当一个connection的首个包经过一次后，connection的state由NEW变成了ESTABLISHED；对于ESTABLISHED的connection的后续packets，内核会自动按照该connection的首个包在nat:PREROUTING和nat:POSTROUTING环节的处理方式进行处理，而不再流经这两个链中的nat表逻辑。而ebtables中似乎没有这个逻辑。
 
 ## 3.Local Process to Container
 
