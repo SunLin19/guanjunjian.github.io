@@ -1,7 +1,7 @@
 ---
 layout:     post
-title:      "study15.《再谈Docker容器单机网络：利用iptables trace和ebtables log》读后整理"
-date:       2017-12-5 11:00:00
+title:      "study15.博文《再谈Docker容器单机网络：利用iptables trace和ebtables log》读后整理"
+date:       2017-12-5 11:00:00 
 author:     "guanjunjian"
 categories: 容器网络知识
 tags:
@@ -15,7 +15,7 @@ tags:
 
 >
 > 本文对Tony Bai博文[再谈Docker容器单机网络：利用iptables trace和ebtables log](http://tonybai.com/2017/11/06/explain-docker-single-host-network-using-iptables-trace-and-ebtables-log/)的内容整理，对其中一些不懂的知识点补充，并增加图片了解。
->
+> 
 > 文中图片和日志均出自该博文。
 >
 
@@ -129,7 +129,7 @@ TRACE: filter:FORWARD:rule:4
 TRACE: filter:DOCKER:return:1
 TRACE: filter:FORWARD:rule:6
 TRACE: eb:nat:POSTROUTING
-TRACE: nat:POSTROUTING:policy:2
+TRACE: nat:POSTROUTING:policy:2 
 ```
 
 **数据流图-----图4.**
@@ -259,3 +259,4 @@ TRACE: eb:nat:POSTROUTING
 * *2.[iptables详解(10):iptables自定义链](http://www.zsythink.net/archives/1625)*
 * *3.[Docker 网络学习笔记](http://lib.csdn.net/article/docker/1004)*
 * *4.[iptables中的return](http://blog.csdn.net/wsclinux/article/details/53256494)*
+
