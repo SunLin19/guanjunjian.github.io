@@ -25,7 +25,7 @@ tags:
 
 
 
-## cls_cgroup_classify
+## 1.cls_cgroup_classify
 
 `cls_cgroup_classify`
 
@@ -52,9 +52,9 @@ static int cls_cgroup_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 
 下面进入task_get_classid(skb)
 
-## task_get_classid
+## 2.task_get_classid
 
-`cls_cgroup_classify--->task_get_classid`
+`cls_cgroup_classify()--->task_get_classid()`
 
 这里要分析的是`#ifdef CONFIG_CGROUP_NET_CLASSID`中的`task_get_classid()`
 
@@ -88,9 +88,9 @@ static inline u32 task_get_classid(const struct sk_buff *skb)
 
 由于[net_next]中是在`n_serving_softirq()`中恢复了classid，所以这里主要分析`sock_cgroup_classid()`。
 
-## sock_cgroup_classid
+## 3 sock_cgroup_classid
 
-`cls_cgroup_classify--->task_get_classid--->sock_cgroup_classid`
+`cls_cgroup_classify()--->task_get_classid()--->sock_cgroup_classid()`
 
 ```c
 static inline u32 sock_cgroup_classid(struct sock_cgroup_data *skcd)
@@ -161,8 +161,10 @@ struct sock_cgroup_data {
 
 * 1.sock结构体的sk_cgrp_data就是sock_cgroup_data结构体，该结构体包含了每个socket的cgroup信息。
 * 2.在legacy hierarchy(传统的层级，指的是cgroup v1)中，net_prio和net_cls可以设置sock的sk_cgrp_data，该信息可以被网络层检测到；在default hierarchy(指的是cgroup v2)中，sock与它所在的cgroup相关联，那么网络层就可以直接与cgroup匹配。
-* 3.为了避免数据冗余，sock_cgroup_data对prioidx和classid进行了重载。在系统初启动时，sock_cgroup_data记录的是创建sock的cgroup，因此cgroup2可以直接与cgroup匹配([参考2]中提出,在cgroup2中，xt_cgroup可以直接与cgroup路径匹配)；一旦net_prio或net_cls启用了，那么prioidx和/或classid就代表的是它们字面的意思。可以根据sock_cgroup_data实例的最低位(lowest bit)来区分这两种模式，如果最低位是0，那么代表的是crgoup指针，如果是1，代表的是priodix和classid。
+* 3.为了避免数据冗余，sock_cgroup_data对prioidx和classid进行了重载。在系统初启动时，sock_cgroup_data记录的是创建sock的cgroup，因此cgroup2可以直接与cgroup匹配(`[参考2]`中提出,在cgroup2中，xt_cgroup可以直接与cgroup路径匹配)；一旦net_prio或net_cls启用了，那么prioidx和/或classid就代表的是它们字面的意思。可以根据sock_cgroup_data实例的最低位(lowest bit)来区分这两种模式，如果最低位是0，那么代表的是crgoup指针，如果是1，代表的是priodix和classid。
 * 4.用户可以在任何时刻启用net_prio和net_cls，一旦他们被启用了，cgroup2匹配(xt_cgroup)将不在工作。当模式转换时，sock指向的cgroup引用有可能会溢出，而这通过同步添加sock_cgroup_data来弥补，但是这是在假设溢出的cgroup的数量有限且不多的情况下才成立的，这似乎是一个更好的权衡。
+
+再回到`sock_cgroup_classid`函数，可以理解，`return (skcd->is_data & 1) ? skcd->classid : 0;`表达的是，如果最后一位set，即使用的是cgroup v1的模式，则可以从sock_cgroup_data中获得classid。
 
 
 
