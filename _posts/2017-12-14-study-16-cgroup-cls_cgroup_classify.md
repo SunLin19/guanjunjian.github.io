@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study16.[net_cls]cls_cgroup_classify()分析"
+title:      "study16.[net_cls]cls_cgroup_classify()分析---classid的存储"
 date:       2017-12-14 15:00:00
 author:     "guanjunjian"
 categories: 网络流量控制
@@ -17,9 +17,7 @@ tags:
 >
 > 了解该函数的目的是根据[net_next](https://lists.linuxfoundation.org/pipermail/containers/2014-January/033844.html)
 >
-> 基于内核4.3，文档生成时间 2015-11-02 12:44 EST。
->
-> 这个子系统使用等级识别符（classid）标记网络数据包，可允许 Linux 流量控制程序（tc）识别从具体 cgroup 中生成的数据包。
+> 基于内核4.14.5
 >
 
 
@@ -56,7 +54,7 @@ static int cls_cgroup_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 
 `cls_cgroup_classify()--->task_get_classid()`
 
-这里要分析的是`#ifdef CONFIG_CGROUP_NET_CLASSID`中的`task_get_classid()`
+这里要分析的是`#ifdef CONFIG_CGROUP_NET_CLASSID`中的`task_get_classid()`,L53。
 
 ```c
 static inline u32 task_get_classid(const struct sk_buff *skb)
@@ -86,7 +84,7 @@ static inline u32 task_get_classid(const struct sk_buff *skb)
 }
 ```
 
-由于[net_next]中是在`n_serving_softirq()`中恢复了classid，所以这里主要分析`sock_cgroup_classid()`。
+由于[net_next]中是在`in_serving_softirq()`中恢复了classid，所以这里主要分析`sock_cgroup_classid()`。
 
 ## 3 sock_cgroup_classid
 
