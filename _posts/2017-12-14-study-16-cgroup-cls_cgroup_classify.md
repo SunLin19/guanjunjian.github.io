@@ -164,8 +164,9 @@ struct sock_cgroup_data {
 
 再回到`sock_cgroup_classid`函数，可以理解，`return (skcd->is_data & 1) ? skcd->classid : 0;`表达的是，如果最后一位set，即使用的是cgroup v1的模式，则可以从sock_cgroup_data中获得classid。
 
+## 总结
 
-
+classid存储在`skb->sk->sk_cgrp_data->classid`,它们的数据类型是`sk_buff->sock->sock_cgroup_data->u32`。
 
 ## 参考
 
