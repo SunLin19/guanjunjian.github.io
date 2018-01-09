@@ -1,18 +1,19 @@
 ---
 layout:     post
-title:      "study17.《C和指针》知识点"
+title:      "study19.《C和指针》知识点总结"
 date:       2018-01-09 10:00:00
 author:     "guanjunjian"
 categories: 读书
 tags:
     - study
+    - summary
 ---
 
 * content
 {:toc}
 
 >
-> 《C和指针》 知识要点
+> 《C和指针》 知识要点总结，持续更新
 >
 
 
