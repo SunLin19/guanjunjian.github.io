@@ -24,33 +24,33 @@ tags:
 发送端(veth):
 
 ```
---->dev_forward_skb()
-    --->__dev_forward_skb()   
-        --->____dev_forward_skb()
-            --->if()    // 判断是否可转发 
-            --->skb_scrub_packet() //清除skb可能破坏命名空间独立性的信息
-                --->skb_orphan()
-                    --->skb->destructor()  //调用skb的destructor
-                    --->skb->sk     = NULL  //将skb的sk字段设为NULL，这里classid就被丢弃了
-            --->skb->priority = 0
-        --->if (likely(!ret))   // 如果____dev_forward_skb执行正确 
-            --->skb->protocol = eth_type_trans()
-            --->skb_postpull_rcsum()
-    --->netif_rx_internal()  //如果__dev_forward_skb执行正确
-        --->enqueue_to_backlog()    //将数据包添加到per-cpu的接收队列中
-            --->__skb_queue_tail()  //将skb保存到input_pkt_queue队列中
-            --->____napi_schedule() //唤醒软中断
-                --->list_add_tail()  //将该设备添加到softnet_data的poll_list队列中
-                --->__raise_softirq_irqoff()  //唤醒软中断，调用对应的设备(veth peer)来收包
+|--->dev_forward_skb()
+    |--->__dev_forward_skb()   
+    |    |--->____dev_forward_skb()
+    |    |    |--->if()    // 判断是否可转发 
+    |    |    |--->skb_scrub_packet() //清除skb可能破坏命名空间独立性的信息
+    |    |    |    |--->skb_orphan()
+    |    |    |        |--->skb->destructor()  //调用skb的destructor
+    |    |    |        |--->skb->sk     = NULL  //将skb的sk字段设为NULL，这里classid就被丢弃了
+    |    |    |--->skb->priority = 0
+    |    |--->if (likely(!ret))   // 如果____dev_forward_skb执行正确 
+    |        |--->skb->protocol = eth_type_trans()
+    |        |--->skb_postpull_rcsum()
+    |--->netif_rx_internal()  //如果__dev_forward_skb执行正确
+        |--->enqueue_to_backlog()    //将数据包添加到per-cpu的接收队列中
+            |--->__skb_queue_tail()  //将skb保存到input_pkt_queue队列中
+            |--->____napi_schedule() //唤醒软中断
+                |--->list_add_tail()  //将该设备添加到softnet_data的poll_list队列中
+                |--->__raise_softirq_irqoff()  //唤醒软中断，调用对应的设备(veth peer)来收包
 ```
 
 接收端(veth peer)
 
 ```
---->net_rx_action()
-    --->process_backlog()
-        --->__netif_receive_skb()
-            --->__netif_receive_skb_core()
+|--->net_rx_action()
+    |--->process_backlog()
+        |--->__netif_receive_skb()
+            |--->__netif_receive_skb_core()
 ```
 
 这里我们分析的是发送端的处理过程。
