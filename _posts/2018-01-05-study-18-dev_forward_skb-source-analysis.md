@@ -34,14 +34,14 @@ tags:
     |    |    |        |--->skb->sk     = NULL  //将skb的sk字段设为NULL，这里classid就被丢弃了
     |    |    |--->skb->priority = 0
     |    |--->if (likely(!ret))   // 如果____dev_forward_skb执行正确 
-    |        |--->skb->protocol = eth_type_trans()
-    |        |--->skb_postpull_rcsum()
+    |         |--->skb->protocol = eth_type_trans()
+    |         |--->skb_postpull_rcsum()
     |--->netif_rx_internal()  //如果__dev_forward_skb执行正确
-        |--->enqueue_to_backlog()    //将数据包添加到per-cpu的接收队列中
-            |--->__skb_queue_tail()  //将skb保存到input_pkt_queue队列中
-            |--->____napi_schedule() //唤醒软中断
-                |--->list_add_tail()  //将该设备添加到softnet_data的poll_list队列中
-                |--->__raise_softirq_irqoff()  //唤醒软中断，调用对应的设备(veth peer)来收包
+         |--->enqueue_to_backlog()    //将数据包添加到per-cpu的接收队列中
+              |--->__skb_queue_tail()  //将skb保存到input_pkt_queue队列中
+              |--->____napi_schedule() //唤醒软中断
+                  |--->list_add_tail()  //将该设备添加到softnet_data的poll_list队列中
+                  |--->__raise_softirq_irqoff()  //唤醒软中断，调用对应的设备(veth peer)来收包
 ```
 
 接收端(veth peer)
