@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study18. dev_forward_skb分析"
+title:      "study18.dev_forward_skb分析"
 date:       2018-01-05 10:00:00
 author:     "guanjunjian"
 categories: 网络源码分析

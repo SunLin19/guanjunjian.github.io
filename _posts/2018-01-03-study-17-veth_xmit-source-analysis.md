@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study17. veth_xmit分析"
+title:      "study17.veth_xmit分析"
 date:       2018-01-03 10:00:00
 author:     "guanjunjian"
 categories: 网络源码分析
