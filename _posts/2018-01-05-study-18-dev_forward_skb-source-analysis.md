@@ -15,6 +15,8 @@ tags:
 >
 > 基于内核4.14.5
 >
+> 本文是[study17. veth_xmit分析][10]的后续分析
+>
 
 
 
@@ -535,6 +537,7 @@ veth的接收函数没有定义, 使用默认的poll函数, 也就是 process_ba
 [7]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-18-dev_forward_skb-source-analysis/softnet_data.png "softnet_data图片"
 [8]:http://blog.csdn.net/u011955950/article/details/41445791 "网络数据包接收之GRO处理"
 [9]:https://www.cnblogs.com/ck1020/p/6838234.html   "Linux NAPI处理流程分析"
+[10]:https://guanjunjian.github.io/2018/01/03/study-17-veth_xmit-source-analysis/ "study17. veth_xmit分析"
 
 
 
