@@ -328,6 +328,13 @@ static inline void skb_orphan(struct sk_buff *skb)
 
 ### 3.2 netif_rx_internal(skb)
 
+根据[[参考9][9]]，`netif_rx_internal()`就是非NAPI设备对应的中断上半部。
+
+这里说一下NAPI设备和非NAPI设备的区别：
+
+-	NAPI设备：首次数据包的接收使用中断的方式，而后续的数据包就会使用轮询处理了，也就是`中断+轮询`，在设备调度处理数据期间，禁止中断
+-	非NAPI设备：每次都是通过中断通知，在设备调度处理数据期间允许中断，会继续收包
+
 若`3.1 __dev_forward_skb(dev, skb)`中的所有过程执行顺利，该函数返回0，`return __dev_forward_skb(dev, skb) ?: netif_rx_internal(skb);`将继续调用`netif_rx_internal()`，该小节将详细分析`netif_rx_internal()`的执行过程。
 
 ```c
@@ -396,9 +403,9 @@ static int netif_rx_internal(struct sk_buff *skb)
 struct softnet_data {
     ...
     struct list_head    poll_list;  //连接所有的轮询设备
-    struct sk_buff_head process_queue;  //处理数据时从该队列取，负责处理
-    struct sk_buff_head input_pkt_queue;  //数据包到来时首先填充到该队列，负责接收
-    struct napi_struct  backlog;  //代表一个虚拟设备供轮询使用
+    struct sk_buff_head process_queue;  //用于非NAPI设备，因为NAPI设备有自己的队列，处理数据时从该队列取，负责处理
+    struct sk_buff_head input_pkt_queue;  //用于非NAPI设备，因为NAPI设备有自己的队列，数据包到来时首先填充到该队列，负责接收
+    struct napi_struct  backlog;  //用于NAPI设备，代表一个虚拟设备供轮询使用，当轮询到该设备时，就会使用以上两个队列
     ...
 }
 ```
@@ -509,7 +516,7 @@ static inline void ____napi_schedule(struct softnet_data *sd,
 
 根据[[参考1][1]]可知：
 
-veth的接收函数没有定义, 使用默认的poll函数（非NAPI）, 也就是 process_backlog，未指定的NAPI默认调用过程如下：
+veth的接收函数没有定义, 使用默认的poll函数（非NAPI）, 也就是`process_backlog`，非NAPI默认调用过程如下：
 
 ```
 --->net_rx_action()
@@ -519,6 +526,79 @@ veth的接收函数没有定义, 使用默认的poll函数（非NAPI）, 也就�
 ```
 
 然后数据包进入网络层。
+
+下面看看`process_backlog()`的实现。
+
+#### process_backlog()
+
+```c
+static int process_backlog(struct napi_struct *napi, int quota)
+{
+	struct softnet_data *sd = container_of(napi, struct softnet_data, backlog);
+	bool again = true;
+	int work = 0;
+
+	/* Check if we have pending ipi, its better to send them now,
+	 * not waiting net_rx_action() end.
+	 */
+	if (sd_has_rps_ipi_waiting(sd)) {
+		local_irq_disable();
+		net_rps_action_and_irq_enable(sd);
+	}
+
+	napi->weight = dev_rx_weight;
+	while (again) {
+		struct sk_buff *skb;
+		/*
+			涉及到两个队列process_queue和input_pkt_queue，数据包到来时首先填充input_pkt_queue，
+			而在处理时从process_queue中取，根据这个逻辑，首次处理process_queue必定为空，检查input_pkt_queue
+			如果input_pkt_queue不为空，则把其中的数据包迁移到process_queue中，然后继续处理，减少锁冲突。
+		*/
+		while ((skb = __skb_dequeue(&sd->process_queue))) {
+			rcu_read_lock();
+			__netif_receive_skb(skb);
+			rcu_read_unlock();
+			input_queue_head_incr(sd);
+			if (++work >= quota)
+				return work;
+
+		}
+
+		local_irq_disable();
+		rps_lock(sd);
+		if (skb_queue_empty(&sd->input_pkt_queue)) {
+			/*
+			 * Inline a custom version of __napi_complete().
+			 * only current cpu owns and manipulates this napi,
+			 * and NAPI_STATE_SCHED is the only possible flag set
+			 * on backlog.
+			 * We can use a plain write instead of clear_bit(),
+			 * and we dont need an smp_mb() memory barrier.
+			 */
+			napi->state = 0;
+			again = false;
+		} else {
+			skb_queue_splice_tail_init(&sd->input_pkt_queue,
+						   &sd->process_queue);
+		}
+		rps_unlock(sd);
+		local_irq_enable();
+	}
+
+	return work;
+}
+```
+
+根据[[参考9][9]]:
+
+>需要注意的每次处理都携带一个配额，即本次只能处理quota个数据包，如果超额了，即使没处理完也要返回，这是为了保证处理器的公平使用。
+>处理在一个while循环中完成，循环条件正是work < quota，首先会从process_queue中取出skb,调用__netif_receive_skb上传给协议栈，然后增加work。
+>当work即将大于quota时，即++work >= quota时，就要返回。
+>当work还有剩余额度，但是process_queue中数据处理完了，就需要检查input_pkt_queue，因为在具体处理期间是开中断的，那么期间就有可能有新的数据包到来。
+>如果input_pkt_queue不为空，则调用skb_queue_splice_tail_init函数把数据包迁移到process_queue。
+>如果剩余额度足够处理完这些数据包，那么就把虚拟设备移除轮询队列。
+
+自此，`dev_forward_skb`的整个流程分析完毕。
 
 ## 参考
 
