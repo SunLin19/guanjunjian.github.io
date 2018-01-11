@@ -461,12 +461,15 @@ enqueue:
         //只有qlen是0(表示虚拟设备没有被调度)的时候才执行到这里
         /*
         否则需要调度backlog即虚拟设备，然后再入队。napi_struct实例backlog中的state字段如果标记了NAPI_STATE_SCHED,则表明该设备已经在调度，不需要再次调度
+        NAPI_STATE_SCHED：表示设备将在内核的下一次循环时被轮询
+        NAPI_STATE_DISABLE：表示轮询已经结束且没有更多的分组等待处理，但设备并没有从poll list移除
         */
         if (!__test_and_set_bit(NAPI_STATE_SCHED, &sd->backlog.state)) {
             //未处于调度状态
             if (!rps_ipi_queued(sd))
                 /*
-                该函数把设备对应的napi_struct结构（每个设备对应一个napi_struct结构）插入到softnet_data的poll_list链表尾部，然后唤醒软中断，这样在下次软中断得到处理时，中断下半部就会得到处理
+                该函数把设备对应的napi_struct结构（每个设备对应一个napi_struct结构）插入到softnet_data的poll_list链表尾部，然后唤醒软中断，这样在下次软中断得到处理时，中断下半部就会得到处理。
+				对于NAPI设备，传入的是自己的napi_struct，而对于非NAPI设备，则传入虚拟设备backlog。
                 */
                 ____napi_schedule(sd, &sd->backlog);
         }
@@ -500,11 +503,13 @@ static inline void ____napi_schedule(struct softnet_data *sd,
 }
 ```
 
-根据[[参考8][8]]从`netif_rx_internal()`到`____napi_schedule()`是中断处理的上半部，当调用了`__raise_softirq_irqoff()`则就进入中断处理的下半部，这里就先详细讨论了。
+根据[[参考8][8]]从`netif_rx_internal()`到`____napi_schedule()`是中断处理的上半部，当调用了`__raise_softirq_irqoff()`则就进入中断处理的下半部。
+
+无论是NAPI接口还是非NAPI最后都是使用 net_rx_action 作为软中断处理函数。
 
 根据[[参考1][1]]可知：
 
-veth的接收函数没有定义, 使用默认的poll函数, 也就是 process_backlog，未指定的NAPI默认调用过程如下：
+veth的接收函数没有定义, 使用默认的poll函数（非NAPI）, 也就是 process_backlog，未指定的NAPI默认调用过程如下：
 
 ```
 --->net_rx_action()
