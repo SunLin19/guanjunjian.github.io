@@ -341,7 +341,7 @@ static int netif_rx_internal(struct sk_buff *skb)
     
     if (static_key_false(&generic_xdp_needed)) {
         int ret;
-
+        //禁止抢占
         preempt_disable();
         rcu_read_lock();
         ret = do_xdp_generic(rcu_dereference(skb->dev->xdp_prog), skb);
@@ -433,7 +433,7 @@ static int enqueue_to_backlog(struct sk_buff *skb, int cpu,
     unsigned int qlen;
     //获得指定cpu的softnet_data结构体
     sd = &per_cpu(softnet_data, cpu);
-
+    //关闭中断
     local_irq_save(flags);
 
     rps_lock(sd);
