@@ -94,10 +94,10 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 	peer = rtnl_create_link(net, ifname, name_assign_type,
 				&veth_link_ops, tbp);
 	...
-    //注册peer
+ 	//注册peer
 	err = register_netdevice(peer);
     ...
-    //互相将peer保存到private中，在xmit的时候使用
+	//互相将peer保存到private中，在xmit的时候使用
 	priv = netdev_priv(dev);
 	rcu_assign_pointer(priv->peer, peer);
 
@@ -126,7 +126,7 @@ struct veth_priv {
 ```c
 static void veth_setup(struct net_device *dev)
 {
-    //以太网设备的通用初始化 
+	//以太网设备的通用初始化 
 	ether_setup(dev);
 
 	dev->priv_flags &= ~IFF_TX_SKB_SHARING;
@@ -134,7 +134,7 @@ static void veth_setup(struct net_device *dev)
 	dev->priv_flags |= IFF_NO_QUEUE;
 	dev->priv_flags |= IFF_PHONY_HEADROOM;
     
-    //veth的操作列表，其中包括veth的发送函数veth_xmit
+	//veth的操作列表，其中包括veth的发送函数veth_xmit
 	dev->netdev_ops = &veth_netdev_ops;
 	dev->ethtool_ops = &veth_ethtool_ops;
 	dev->features |= NETIF_F_LLTX;
@@ -159,7 +159,7 @@ static void veth_setup(struct net_device *dev)
 ```c
 static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-    //获取veth的私有数据
+	//获取veth的私有数据
 	struct veth_priv *priv = netdev_priv(dev);
 	struct net_device *rcv;
 	int length = skb->len;
@@ -170,7 +170,7 @@ static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 		kfree_skb(skb);
 		goto drop;
 	}
-    //调用dev_forward_skb向该veth的peer发送数据包
+	//调用dev_forward_skb向该veth的peer发送数据包
 	if (likely(dev_forward_skb(rcv, skb) == NET_RX_SUCCESS)) {
 	    //如果发送成功，则更新veth的数据包统计
 		struct pcpu_vstats *stats = this_cpu_ptr(dev->vstats);
