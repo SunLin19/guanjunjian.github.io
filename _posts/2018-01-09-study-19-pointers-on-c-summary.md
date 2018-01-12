@@ -932,3 +932,239 @@ average ( int n_values, ...)
 -   对维数组初始化使用多层花括号能提高可读性
 
 ---
+
+# 第9章 字符串、字符和字节
+
+-   C语言没有显示的字符串数据类型
+-   字符串以字符串常量的形式出现或者存储于字符数组中，字符串常量适合用于不会对它们进行修改的字符串
+
+## 9.1 字符串基础
+
+-   字符串就是一串零个或多个字符，并且以一位模式全为0的NUL字节结尾，但它本身不是字符串的一部分，所以字符串的长度并不包括NUL字节
+-   `string.h`包含了字符串函数所需要的原型和声明，但是并非必须
+
+---
+
+## 9.2 字符串长度
+
+-   字符串的长度就是它所包含的字符个数，不包括NUL
+-   `size_t strlen( char const *string )`
+-   返回类型为`size_t`，定义在头文件`stddef.h`，是一个无符号整数类型
+-   `if( strlen( x ) - strlen( y ) >= 0)`这条语句永远是true，因为strlen返回的是无符号数，而无符号数是绝对不可能是负的
+-   `if( strlen( x ) >= 10 )`与`if( strlen( x ) -10 >= 0 )`不相等，原因与上同，可以将返回值强制转换为int就可以解决这个问题
+-   标准库函数有时是用汇编语言实现的，目的就是充分利用某些机器所提供的字符串操作指令，从而追求最大的速度
+
+---
+
+## 9.3 不受限制的字符串函数
+
+### 9.3.1 复制字符串
+
+-   `char *strcpy( char *dst, char const *src);`
+-   由于dst参数是需要修改的，所以不能使用字符串常量
+-   必须保证目标字符数组的空间足以容纳需要复制的字符串。如果超长，多余的字符仍然被复制，会覆盖原先存储于数组后面的内存空间的值
+
+### 9.3.2 连接字符串 
+
+-   `char *strcat ( char *dst, char const *src);`
+-   如果src和dst的位置发生重叠，其结果是未定义的
+
+### 9.3.3 函数的返回值
+
+-   strcpy和strcat返回第1个参数的一份拷贝，就是一个指向目标字符数组的指针
+-   所以这些函数都可以嵌套地调用这些函数
+
+### 9.3.4 字符串比较
+
+-   `int strcmp( char const *s1, char const *s2 );`
+-   两个字符串对应的字符逐个进行比较，直到发现不匹配为止
+    -   最先不匹配的字符较“小”的那个字符所在的那个字符串被认为“小于”另外一个字符串
+    -   其中一个字符串是另一个字符串前面一部分，那么它也被认为“小于”另外一个字符串
+-   s1小于s2，返回一个小于零的值（不一定是-1）；s1大于s2，返回一个大于零的值（不一定是1）；两个字符串相等，则函数返回零
+
+---
+
+## 9.4 长度受限的字符串函数
+
+-   这些函数接受一个现实的长度参数
+-   如果源参数和目标参数发生重叠，strcpy和strncat的结果就是未定义的
+```c
+char *strncpy( char *dst, char const *src, size_t len );
+char *strncat( char *dst, char const *src, size_t len );
+int *strncmp( char const *s1, char const *s2, size_t len );
+```
+-   如果strlen(src)的值小于len，dst数组就用额外的NUL字节填充到len长度
+-   如果strlen(src)的值大于或等于len，那么只有len个字符被复制到dst中，注意！它的结果不会以NUL字节结尾
+-   在使用不受限的函数之前，你首先必须确定字符串实际上是以NUL字节结尾的，但长度受限函数不需要
+-   strncat总是在结果字符串后面添加一个NUL字节，并且不会像strcpy用NUL字节进行填充
+
+---
+
+## 9.5 字符串查找基础
+
+### 9.5.1 查找一个字符
+
+```c
+/*
+在字符串str中查找字符ch第一次出现的位置，找到后返回一个指向该位置的指针
+如果不存在，则返回NULL
+*/
+char *strchr ( char const *str, int ch);
+//与strchr功能相似，但是是最后一次出现的位置
+char *strrchr ( char const *str, int ch);
+```
+
+### 9.5.2 查找任何几个字符
+
+```c
+/*
+查找任何一组字符第1次在字符串中出现的位置
+返回一个指向str中第1个匹配group中任何一个字符的字符位置
+未匹配，返回NULL
+*/
+char *strpbrk( char const *str, char const *group );
+```
+
+### 9.5.3 查找一个子串
+
+```c
+/*
+如果s2并没有完整地出现在s1的任何地方，函数返回NULL
+如果s2是一个空字符串，返回s1
+*/
+char *strstr( char const *s1, char const *s2 );
+```
+-   标准库中并不存在strrstr或strrpbrk
+
+---
+
+## 9.6 高级字符串查找
+
+### 9.6.1 查找一个字符串前缀
+
+-   strspn和strcspan用于在字符串的起始位置对字符计数
+-   strspn()从参数str字符串的开头计算连续的字符，而这些字符都完全是group 所指字符串中的字符。简单的说，若strspn()返回的数值为n，则代表字符串s开头连续有n 个字符都是属于字符串group内的字符
+```
+//返回str起始部分匹配cgroup中任意字符的字符数
+size_t strspn( char const *str, char const *group );
+//对str字符串起始部分中不与group中任何字符匹配的字符数
+size_t strcspn( char const *str, char const *group );
+
+int len1,len2;
+char buffer[] = "25,142,330,Smith,J,239-4123";
+len1 = strspn (buffer, "0123456789" );  //结果为2，因为只有"25"
+len1 = strspn (buffer, ",0123456789" ); //结果为11,因为"25,142,330,"
+
+//计算一个指向字符串中第1个非空白字符的指针
+ptr = buffer + strspn( buffer, "\n\r\f\t\v"); 
+```
+
+### 9.6.2 查找标记
+
+-   strtok:从字符串中隔离各个单独的称为标记（token）的部分，并丢弃分隔符
+```c
+char *strtok( char *str, char const *sep)
+
+void print_tokens( char *line )
+{
+	static char whitespace[] = " \t\f\r\v\n";
+	char *token;
+
+	for( token = strtok( line, whitespace ); token !=NULL; token = strtok( NULL, whitespace ) )
+	{
+		printf("Next token is %s\n", token);
+	}
+}
+```
+-   sep参数是个字符串，定义了用作分隔的字符集合
+-   strtok找到str的下一个标记，并将其用NUL结尾，然后返回一个指向这个标记的指针
+-   它将会修改它所处理的字符串
+-   如果strtok函数的第1个参数不是NULL，函数将找到字符串的第1个标记，strtok同时保存它在字符串中的位置
+-   如果strtok函数的第1个参数是NULL，函数就在同一个字符串中从这个被保存的位置开始像前面一样查找下一个标记
+-   如果字符串内不存在更多的标记，strtok返回一个NULL指针
+
+<br/>
+
+-   你可以在每次调用strtok时使用不同的分隔符集合
+-   由于strtok函数保存它所处理的函数的局部状态信息，所以你不能用它同时解析两个字符串，因此，如果for循环的循环体内调用了一个在内部调用strtok函数的函数，程序会失败
+
+---
+
+## 9.7 错误信息
+
+-   当调用一些函数，请求操作系统执行一些功能，如果出现错误，操作系统是 通过设置一个外部的整型变量errno进行错误代码报告的
+-   strerror把其中一个错误代码作为参数并返回一个指向用于描述错误的字符串的指针
+-   `char *strerror ( int error_number );`
+
+---
+
+## 9.8 字符操作
+
+-   标准库包含了两组函数用于操作单独的字符：对字符分类和转换字符
+-   ctype.h
+
+### 9.8.1 字符分类
+
+-   每个分类函数接受一个包含字符值的整型参数
+-   函数测试这个字符并返回一个整型值
+-   `isspace`、`isupper`等函数
+-   字符分类函数  表 P184
+
+### 9.8.2 字符转换
+
+-   转换函数把大写字母转换为小写字母，或反过来
+
+```
+int tolower( int ch );
+int toupper( int ch );
+```
+
+-   如果参数并不是一个处于适当大小写状态的字符（不是大写或小写字母），函数将不修改参数直接返回
+-   直接测试或操纵字符将会降低程序的可移植性
+
+---
+
+## 9.9 内存操纵
+
+-   它们的操作与字符串函数类型，但这些函数能够处理任意的字节序列（可以包括NUL）
+
+```c
+//length是以字节为单位的
+void *memcpy( void *dst, void const *src, size_t length );
+void *memmove( void *dst, void const *src, size_t length );
+void *memcmp( void const *a, void const *b, size_t length );
+void *memchr( void const *a, int ch, size_t length );
+void *memset( void *a, int ch, size_t length );
+```
+
+-   它们在遇到NUL字节时并不会停止操作
+-   memcpy中如果src和dst以任何形式出现了重叠，它的结果是未定义的
+-   任何类型的指针都可以转换为void*型指针
+-   memmove的行为和memcpy差不多，但它的源和目标操作数可以重叠，它可能比memcpy慢一些，但源和目标参数真的可能存在重叠，就应该使用memmove。原理：把源操作数复制到一个临时位置，这个临时位置不会与源或目标操作数重叠，然后再把它从这个临时位置复制到目标操作数
+-   memcmp按照无符号字符逐字节进行比较，函数的返回类型和strcmp一样。如果比较不是单字节的数据如整型或浮点数时就可能出现不可预料的结果
+-   memset把从a开始的length个字节都设置为字符值ch
+
+---
+
+## 9.10 总结
+
+-   字符串的长度就是它所包含的字符的数目，不包括NUL
+-   strncpy中，如果源字符串比指定长度更长，结果字符串将不会以NUL字节结尾
+-   strncat它的结果始终以一个NUL字节结尾
+
+---
+
+## 9.11 警告的总结
+
+-   应该使用有符号数的表达式中使用strlen函数，返回值类型size_t是无符号整型
+-   把strcmp函数的返回值当做布尔值进行测试，是错误的
+-   把strcmp函数的返回值与1或-1进行比较，是错误的
+-   使用strcpy函数产生不以NUL字节结尾的字符串
+-   忘了strtok函数将会修改它所处理的字符串
+-   strtok函数是不可再入的，即连续几次调用中，即使它们的参数相同，其结果也可能不同
+
+---
+
+## 9.12 编程提示的总结
+
+-   使用字符分类和转换函数可以提高函数的移植性
