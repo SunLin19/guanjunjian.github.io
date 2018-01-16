@@ -2286,3 +2286,483 @@ int rename( char const *oldname, char const *newname );
 
 -   当你打印长整数时，坚持使用`l`修改符可以提高可移植性
 
+---
+
+# 第16章 标准函数库
+
+## 16.1 整型函数
+
+-   分为三类：算数、随机数、字符串转换
+
+### 16.1.1 算数<stdlib.h>
+
+```c
+//绝对值
+int abs( int value );
+//绝对值，作用对象是长整数
+long int labs( long int value );
+//即计算numberator/denominator，用一个div_V结构体返回，与/的区别是对运算结果精确定义：如果不能整除，商将是所有小于代数商的整数中最靠近它的那个整数
+div_t div ( int numberator, in denominator );
+//与div相同，作用对象是长整数
+ldiv_t ldiv( long int number, long int denom );
+```
+
+### 16.1.2 随机数<stdlib.h>
+
+-   以下两个函数何在一起使用能够产生伪随机数，“伪”是因为它们通过计算产生随机数，因此可能重复出现，并不是正真的随机数
+
+```c
+//返回一个范围在0和RAND_MAX（至少为32767）之间的伪随机数
+//为了得到一个更小范围的伪随机数，首先把这个函数的返回值根据所需要的范围的大小进行取模，再通过加上或减去一个偏移量进行调整获得
+int rand( void );
+//该函数使用seed参数对随机数发生器进行初始化
+void srand( unsigned int seed );
+//一般使用每天的时间作为随机数产生器的种子
+srand( ( unsigned int )time( 0 ) );
+```
+
+### 16.1.3 字符串转换<stdlib.h>
+
+```c
+//把字符转换为整数
+int atoi( char const *string );
+//把字符转换为长整数
+long int atol( char const *string );
+/*
+把字符转换为长整数
+@unused：保存一个指向转换值后面第1个字符的指针unused，这个指针允许字符串的剩余部分进行处理而无需推测转换在字符串的哪个位置终止
+@base:转换所执行的基数（即什么进制，例如十进制、二进制），若基数为0，任何在程序中用于书写整数字面值的形式都被接收，包括指定数字基数的形式，如0x2af4和0377；否则基数值应该在2到36的范围内
+*/
+long int strtol( char const *string, char **unused, int base );
+//与strtol相同，但作用对象是无符号长整数
+unsigned long int strtoul( char const *string, char **unused, int base );
+//x为9947（以12进制来计算），指向字母e的指针保存在*next中
+x = strtol( "     590bear", next, 12 );
+```
+
+-   若第1个参数包含前导空白字符，将被跳过；存在任何非法尾缀字符，也将被忽略
+-   如果这些函数的string不包含一个合法的数值，函数就返回0
+-   被转换的值无法表示，则在errno中存储ERANGE这个值，并返回特定值，这些值在[P329,表16.1,strtol和strtoul返回的错误值]中
+
+---
+
+### 16.2 浮点型函数
+
+-   定义域错误：如果一个函数的参数不在该函数的定义域之内
+    -   `sqrt( -6.0 );`
+    -   当出现定义域错误时，函数返回一个由编译器定义的错误值，并在errno中存储EDOM   
+-   范围错误：如果一个函数的结果值过大或过小，无法用double类型表示
+    -   `exp( DBL_MAX )`
+    -   值过大，函数将返回HUGE_VAL
+    -   值过小，无法用double表示，返回0，但errno会不会设置为ERANGE取决于编译器
+
+### 16.2.1 三角函数<math.h>
+
+### 16.2.2 双曲函数<math.h>
+
+### 16.2.3 对数和指数函数<math.h>
+
+```c
+//e值的x次幂
+double exp( double x );
+//x以e为底的对数，loge x
+double log( double x );
+//x以10为底的对数，log10 x
+double log10( double x );
+```
+
+### 16.2.4 浮点表示形式<math.h>
+
+```c
+double frexp( double value, int *exponent );
+double ldexp( double fraction, int exponent );
+//把浮点值分成整数和小数两个部分，每个部分具有和原值一样的符号。整数部分以double类型存储于ipart指向的内存位置，小数部分作为函数的返回值返回
+double modf( double value, double *ipart );
+```
+
+### 16.2.5 幂<math.h>
+
+```c
+//x的y次幂
+double pow( double x, double y );
+//返回x的平方根
+double sqrt( double x );
+```
+
+### 16.2.6 底数、顶数、绝对值和余数<math.h>
+
+```c
+//返回不大于其参数的最大整数值
+double floor( double x );
+//返回不小于其参数的最小整数值
+double ceil( double x );
+//返回参数的绝对值
+double fabs( double x );
+//返回x除以y所产生的余数，这个除法的商被限制为一个整数值
+double fnid( double x, double y );
+```
+
+### 16.2.7 字符串转换<stblib.h>
+
+```c
+double atof( char const *string);
+//将string转换为一个double值，保存一个指向字符串中被转换的值后面的第1个字符的指针
+double strtod(char const *string, char **unuserd );
+```
+
+-   string中前导空白符和缀尾非法字符被忽略
+-   如果值太大或太小，无法用double表示，errno存储ERANGE
+-   如果值太大，返回HUGE_VAL；值太小，返回零
+
+---
+
+## 16.3 日期和时间函数
+
+### 16.3.1 处理器时间<time.h>
+
+```c
+clock_t clock( void )
+```
+
+-   返回值为近似值
+-   如果机器无法提供处理器时间或时间值太大，无法用clock_t表示，返回-1
+-   clock的返回值为处理器时钟滴答的次数，若要转换为秒，要除以常量`CLOCKS_PER_SEC`
+
+### 16.3.2 当天时间<time.h>
+
+```c
+time_t time( time_t *returned_value );
+```
+
+-   如果参数非NULL，时间值也会存储到参数中
+-   无法提供，或值太大，time_t无法表示，返回-1
+
+#### 日期和时间的转换<time.h>
+
+-   以下的函数用于操作time_h值
+
+```c
+/
+*
+返回值为一个指向字符串的指针，字符串的格式为 Sun Jul 4 04:02:48 1976\n\0
+该字符串存储在一个静态数组中，下次调用ctime后，旧值会被覆盖
+*/
+char *ctime( time_t const *time_value );
+//计算time1-time2的差，并转为秒
+double difftime( time_t time1, time_t time2 );
+```
+
+-   以下两个函数把一个time_t结构转换为tm结构
+-   月份从0开始计算，即0表示1月，11表示12月
+-   tm结构的字段位于[P334,表16.2,tm结构的字段]
+-   tm_year是从1900年后的年数，为了计算实际年份，需要加上1900
+
+```c
+//转为世界协调世界（UTC），即格林尼治标准时间
+struct tm *gmtime( time_t const *time_value );
+//转为当地世界
+struct tm *localtime( time_t const *time_value );
+```
+
+-   当拥有一个tm结构之后，可以使用以下函数
+
+```c
+//返回一个类似Sun Jul 4 04:02:48 1976\n\0的字符串，与ctime的一样，ctime在内部应该就是调用了asctime实现自己的功能的
+char *asctime( struct tm const *tm_ptr );
+/*
+把tm转换为一个根据某个格式字符串而定的字符串
+如果转换结果字符串的长度小于maxsize，则结果字符串复制到string中，返回值为字符串的长度；否则返回-1
+*/
+size_t strftime( char *string, size_t maxsize, char const *format, struct tm const *tm_ptr );
+```
+
+-   strftime的格式代码包括一个%字符，位于[P335,表16.3,strftime格式代码]
+
+```c
+//tm转换为time_t
+time_t mktime( struct tm *tm_ptr );
+```
+
+---
+
+## 16.4 非本地跳转<setjmp.h>
+
+-   setjmp和longjmp提供了类似goto语句的机制，但并不局限于一个函数的作用域之内，这些函数常用于深层嵌套的函数连用链
+
+```c
+int setjmp ( jmp_buf state );
+void longjmp( jump_buf state, int value );
+```
+
+-   声明一个jmp_buf，并调用setjmp对它进行初始化，setjmp返回零，setjmp把程序的状态信息保存到跳转缓冲区中，你调用setjmp所处的函数称为你的“顶层”函数
+-   调用longjmp将导致jmp_buf这个保存的状态重新恢复，longjmp的效果就是使执行流通过再次从setjmp函数返回，从而跳回到顶层函数中
+-   setjmp第1次被调用时，返回0；当setjmp作为longjmp的执行结果再次返回时，它的返回值是longjmp的第2个参数，它必须是一个非零值
+
+### 16.4.1 实例
+
+```c
+jmp_buf restart;
+
+int main()
+{
+    int value;
+    //确定一个我们希望在longjmp的调用之后恢复执行的地点
+    value = setjmp( restart );
+    
+    switch( setjmp( restart ) ){
+    default:
+        //longjmp被调用--致命错误
+        break;
+    case 1:
+        //longjmp被调用---小错误
+        break;
+    case 0:
+        //最初从setjmp返回的地点：执行正常的处理，若出错，调用类似longjmp( restart, 1 );会跳回顶层函数，并调用case 1
+    }
+}
+```
+
+### 16.4.2 何时使用非本地跳转
+
+-   当顶层函数（调用setjmp的那个）返回时，保存在跳转缓冲区的状态信息便不再有效，在此之后再调用longjmp可能失败
+
+---
+
+## 16.5 信号
+
+-   信号表示一个时间，它可能异步地发生，也就是并不与程序执行过程的任何事件同步
+-   如果程序未安排怎样处理一个特定的信号，会做出一个缺省反应，一般缺省反应为终止程序
+-   程序可以设置一个信号处理函数，当信号发生时程序就调用这个函数，而不选择缺省反应
+
+### 16.5.1 信号名<signal.h>
+
+-   同步表示信号在程序内部发生
+-   异步表示它们在程序的外部产生，通常是程序的用户触发，表示用户试图向程序传递一些信息
+-   以下为[P338,表16.4]
+
+同步或异步 | 信号 | 含义 | 产生原因
+---|---|---|---
+同步 | SIGABRT | 程序请求异常终止 | 由abort函数引发
+同步 | SIGFPE | 发生一个算术错误 | 算术上溢或下溢或除零
+同步 | SIGILL | 检测到非法指令 | CPU试图执行一条非法的指令
+同步 | SIGSEGV | 检测到对内存的非法访问 | 程序试图非法访问内存
+异步 | SIGINT | 收到一个交互性注意信号 | 用户试图中断程序
+异步 | SIGTERM | 收到一个终止程序的请求 | 用户另一种请求终止程序的信息
+
+-   SIGINT和SIGTERM的区别
+    -   SIGINT定义一个信号处理函数，目的是执行一些日常维护工作并在程序退出前保存数据
+    -   SIGTERM不配备信号处理函数，这样当程序终止时便不必执行这些日常维护工作
+
+### 16.5.2 处理信号<signal.h>
+
+```c
+//用于显示地引发一个信号，将引发参数所指定的信号
+int raise( int sig );
+```
+
+-   当一个信号发生时，程序可以使用三种方式作出反应
+    -   缺省：由编译器定义，通常是终止程序
+    -   可以被忽略
+    -   可以设置一个信号处理函数
+
+```c
+//用于指定程序希望采取的反应
+void ( *signal ( int sig, void ( *handle )( int ) ) )( int );
+```
+
+-   下面拆开分析signal函数
+
+```c
+/*
+@sig:为表16.4的信号之一
+@void ( *handle )( int ):为sig信号设置的信号处理函数，是一个函数指针。当信号发生时，信号的代码作为参数传递给信号处理函数
+*/
+signal ( int sig, void ( *handle )( int ) ) 
+
+/*
+下面将原型的参数去掉
+signal函数返回一个指向该信号以前的处理函数的指针，通过保存这个返回值，可以为信号设置一个处理函数并在将来恢复为先前的处理函数
+*/
+void ( *signal() )( int );
+```
+
+-   signal.h还定义了宏`SIG_DFL`和`SIG_IGN`，可以作为siganl函数的第2个参数
+    -   `SIG_DFL`:恢复对该信号的缺省反应
+    -   `SIG_IGN`：该信号被忽略
+
+### 16.5.3 信号处理函数
+
+-   当一个已经设置了信号处理函数的信号发生时
+    -   首先，恢复对该信号的缺省行为
+    -   然后，信号处理函数被调用，信号代码作为参数传递给函数
+-   信号处理函数可能执行的工作类型是很有限的
+    -   异步信号，不应该调用除siganl之外的任何库函数
+    -   信号处理函数除了向一个类型为`volatile sig_atomatic_t`静态变量赋值外，可能无法访问任何其他静态变量
+    -   信号处理函数能做的就是对这些变量之一进行设置然后返回
+    -   类型`sig_atomatic_t`定义了一种CPU可以以原子方式访问的数据类型
+
+#### 一、volatile数据
+
+-   `volatile`关键字告诉编译器，变量的值不能确保在两条相邻的程序语句中具有相同的值，防止编译器以一种可能修改程序含义的方式“优化”程序
+
+#### 二、从信号处理函数返回
+
+-   从一个信号处理函数返回导致程序的执行流从信号发生的地点恢复，这个规则的例外情况是SIGFPE
+
+---
+
+## 16.6 打印可变参数列表<stdarg.h>
+
+```c
+int vprintf( char const *format, va_list arg );
+int vfprintf( FILE *stream, char const *format, va_list arg );
+int vsprintf( char *buffer, char const *format, va_list arg );
+```
+
+-   arg参数必须使用`va_start`进行初始化
+-   不需要调用`va_end`
+
+## 16.7 执行环境
+
+### 16.7.1 终止执行<stdlib.h>
+
+-   以下三个函数与正常或不正常的程序终止有关
+
+```c
+//用于不正常地终止一个正在执行的程序，引发SIGABRT信号，可以设置信号处理函数，在程序终止之前采取任何你想要的动作
+void abort( void );
+//该函数可以把一些函数注册为退出函数，当程序将要正常终止时，退出函数被调用
+void atexit( void (func)( void ) );
+/*
+用于正常终止程序
+如果程序以main函数返回一个值结束，那么其效果相当于用这个值作为参数调用exit函数
+*/
+void exit( int status );
+```
+
+-   当exit函数被调用（函数终止过程）
+    -   所有被atexit函数注册为退出函数的函数将按照它们注册的顺序的反序依次调用
+    -   所有流的缓冲区被刷新
+    -   所有打开文件被关闭
+    -   用tmpfile创建的文件被删除
+    -   退出状态返回宿主环境，程序停止执行
+
+### 16.7.2 断言<assert.h>
+
+-   断言就是声明某种东西应该为真
+-   ANSI C实现了一个assert宏
+-   `void assert( int expression );`
+-   当它被执行时，这个宏对表达式参数进行测试。
+-   如果为假（零），就向标准错误打印一条诊断信息并终止程序；如果位真（非零），就不打印任何东西，程序继续执行
+-   `assert( value != NULL );`，如果value为NULL，则会打印`Assertion failed: value != NULL, file.c line 280`
+-   assert只适合用于验证必须为真的表达式
+-   可以在编译时通过定义NDEBUG消除所有的断言，以下任一操作，预处理器将丢弃所有的断言
+    -   使用-DNDEBUG编译器命令行选项
+    -   在源文件中头文件assert.h被包含之前增加`#define NDEBUG`
+
+### 16.7.3 环境<stdlib.h>
+
+-   环境就是 由一个编译器定义的`名字/值`对的列表
+-   该列表由操作系统进行维护
+-   `getenv`函数在这个列表中查找一个指定的名字，如果找到，返回一个指向其值对应的指针；如果未找到，返回NULL
+-   `char *getenv( char const *name );`
+
+### 16.7.4 执行系统命令<stdlib.h>
+
+-   system函数把它的字符串参数传递给宿主操作系统，这样它就可以作为一条命令，由操作系统的命令处理器指执行
+-   `void system( char const *command );`
+-   system可以用一个NULL参数调用，用于询问命令处理器是否实际存在
+
+### 16.7.5 排序和查找
+
+-   qsort函数在一个数组中以升序方式对数据进行排序，和数组中的数据类型无关   
+
+```c
+/*
+@base:指向需要排序的数组
+@n_elements:指定数组中元素的数目
+@el_size:每个元素的长度（以字节为单位）
+@compare：函数指针，用于带需要排序的元素进行比较。比较函数返回一个整数，大于零、等于零和小于零分别表示第1个参数大于、等于和小于第2个参数
+*/
+void qsort( void *base, size_t n_elements, size_t el_size, int (*compare)( void const *, void const * ) );
+```
+
+-   bsearch函数在一个已经**排好序**的数组中用二分法查找一个特定的元素
+-   如果数组未排序，其结果是未定义的
+
+```c
+/*
+@key:指向需要查找的值
+@base:指向查找所在的数组
+@n_elements:指定数组中元素的数目
+@el_size:每个元素的长度（以字节为单位）
+@compare：函数指针，用于带需要排序的元素进行比较。比较函数返回一个整数，大于零、等于零和小于零分别表示第1个参数大于、等于和小于第2个参数
+@返回值：一个指向查找到的数组元素的指针，若不存在，则返回NULL
+*/
+void *bsearch( void const *key, void const *base, size_t n_elements, size_t el_size, int (*compare)( void const *, void const * ) );
+```
+
+---
+
+## 16.8 locale
+
+-   为了使C语言在全世界的范围内更为通用，定义了locale标准，是一组特定的参数，每个国家可能各不相同
+-   缺省情况下是“C” locale
+
+```c
+/*
+用于修改整个或部分locale
+@category:指定locale哪个部分需要修改，可以的值包括LC_ALL：整个locale；LC_COLLATE:对照序列，将影响strcoll和strxfrm函数，更多参照[P346,表16.5,setlocale类型]
+@locale:若不是NULL，它指定需要使用的新locale
+@返回值：返回一个指向给定类型的当前locale的名字的指针
+*/
+char *setlocale( int category, char const *locale );
+```
+
+### 16.8.1 数值和货币格式<locale.h>
+
+-   `struct lconv *localeconv( void );`用于获取根据当前的locale对非货币值和货币值进行核实的格式化所需要的信息，它只提供一些如何进行格式化的信息
+
+### 16.8.2 字符串和locale<string.h>
+
+-   一台机器的字符集的对照序列是固定的，但locale提供了一种方法指定不同的序列
+
+```c
+//对两个根据当前locale的LC_CIKKATE类型参数指定的字符串进行比较
+int strcoll( char const *s1, char const *s2 );
+/*
+把根据当前的locale解释的s2转换为另一个不依赖于locale的字符串（把一个当前对照序列的字符串转换为一个位于缺省对照序列的字符串）
+尽管转换后的字符串的内容是未确定的，但使用strcmp函数对这种字符串进行比较和使用strcoll对原先的字符串比较的结果是相同的
+*/
+size_t strxfrm( char *s1, char const *s2, size_t size );
+```
+
+### 16.8.3 改变locale的效果
+
+-   可能使得字符集增加字符
+-   打印的方向可能会改变
+-   printf和scanf函数家族使用当前定义的小数点符号
+-   isalpha、islower、isspace、isupper函数可能比之前包括更多的字符
+-   字符集的对照序列可能会改变
+-   strftime所产生的日期和时间格式的许多方面都是特定于locale的
+
+---
+
+## 16.9 总结
+
+-   div和ldiv用于执行整数除法。和`/`操作符不同，当其中一个参数为负时，商的值是精确定义的
+-   frexp用于计算一个给定值的表示形式，ldexp用于解释一个表示形式，恢复它的原先值，modf把浮点值分隔成整数和小树部分
+-   tm结构包含了日期和时间的所有组成部分
+-   一个信号处理函数中修改的变量应该声明为`volatile`
+-   locale包括了
+    -   定义数值如何进行格式化的参数，他们描述的值包括非货币值、本地货币值和国际货币值
+    -   可以指定一个和机器的缺省序列不同的对照序列
+
+---
+
+## 16.10 警告的总结
+
+-   longjmp不能返回一个已经不再处于活动状态的函数
+-   从异步信号的处理函数中调用exit或abort是不安全的（处理函数不要再调用除siganl之外的任何库函数）
+-   当每次信号发生时，你必须重新设置信号处理函数
+-   避免exit函数的多重调用

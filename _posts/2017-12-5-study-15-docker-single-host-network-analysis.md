@@ -40,7 +40,9 @@ tags:
 
 文章中实验机的iptables规则列表如下（只展示较为重要的filter和nat表的规则，输出规则number，便于后续match分析时查看）：
 
-```
+filter表：
+
+```shell
 # iptables -nL --line-numbers -v -t filter
 Chain INPUT (policy ACCEPT 2558K packets, 178M bytes)
 num   pkts bytes target     prot opt in     out     source               destination
@@ -67,7 +69,11 @@ num   pkts bytes target     prot opt in     out     source               destina
 Chain DOCKER-USER (1 references)
 num   pkts bytes target     prot opt in     out     source               destination
 1       10   840 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0
+```
 
+nat表：
+
+```shell
 # iptables -nL --line-numbers -v -t nat
 Chain PREROUTING (policy ACCEPT 884 packets, 46522 bytes)
 num   pkts bytes target     prot opt in     out     source               destination
