@@ -3334,8 +3334,8 @@ register int i1, i2, i3, i4, i5, i6, i7, i8, i9, i10;
 
 -   前面提到的`moveml #0x3cfc,sp@`即是将寄存器的旧值保存到堆栈中，函数必须对任何将用于存储寄存器变量的寄存器进行保存，这样它们原先的值可以在函数返回到调用函数前恢复，即`moveml a6@(-88),#0x3cfc`语句，这样就能保留调用函数的寄存器变量
 -   d0-d1、a0-a1以及a6-a7并未用于存储寄存器
-    -   a6用作帧指针
-    -   a7是堆栈指针（别名SP）
+    -   a6用作帧指针，即平时所说的ebp
+    -   a7是堆栈指针（别名SP），即平时所说的esp
     -   d0、d1用于从函数返回值
     -   a0、a1用于其他某种目的
 
@@ -3371,7 +3371,7 @@ register int i1, i2, i3, i4, i5, i6, i7, i8, i9, i10;
     movl   d7,sp@-  //i1存在d7，所以是把i1压入堆栈
     pea    10   //pea指令简单地把它的操作数压入堆栈，所以这里将参数10压入堆栈
     /*
-    跳转子程序，把返回值压入到堆栈中，并跳转到_func_ret_int的起始位置
+    跳转子程序，把返回值压入到堆栈中（即main函数中_func_ret_int函数返回后下一条指令的地址），并跳转到_func_ret_int的起始位置
     当被调用函数结束任务后需要返回到它的调用位置，需要用到压入到堆栈中的返回值
     堆栈的情况如图18.2所示
     */
@@ -3404,8 +3404,8 @@ _func_ret_int:
     /*
     link指令分成三步
     1.a6的内容被压入到堆栈中（旧的a6值被压入）
-    2.堆栈指针的当前值被复制到a6（SP），图18.3显示了目前为止的堆栈帧状态
-    3.link指令从堆栈指针中减去8，这将创建空间用于保存局部变量和被保存的寄存器的旧值，图18.4显示了目前为止的堆栈帧状态
+    2.堆栈指针的当前值被复制到a6（a6指向SP当前位置，当前位置为a6@(0)，也就是将当前栈顶变为新的栈底），图18.3显示了目前为止的堆栈帧状态
+    3.link指令从堆栈指针中减去8（SP指向a6@(-8)），这将创建空间用于保存局部变量和被保存的寄存器的旧值，图18.4显示了目前为止的堆栈帧状态
     */
     link   a6, #-8
     /*
@@ -3588,6 +3588,10 @@ _sum_three_values:
 
 ---
 
+更详细的C函数栈帧操作流程，可以看[《C函数栈帧》][8]
+
+---
+
 [1]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_1.png "图18.1 压入参数后的堆栈帧"
 [2]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_2.png "图18.2 在跳转子程序指令之后的堆栈帧"
 [3]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_3.png "图18.3 link指令期间的堆栈帧"
@@ -3595,6 +3599,7 @@ _sum_three_values:
 [5]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_4_1.png "图18.4.1"
 [6]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_1.png "图2.1 编译过程"
 [7]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_2.png "图2.2 三字母词"
+[8]:https://arkingc.github.io/2018/01/12/c-stack_frame/ "C函数栈帧 "
 
 
 
