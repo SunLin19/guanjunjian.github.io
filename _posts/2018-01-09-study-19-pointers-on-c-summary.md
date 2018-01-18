@@ -3594,7 +3594,7 @@ _sum_three_values:
 [4]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_4.png "图18.4 link指令之后的堆栈帧"
 [5]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_4_1.png "图18.4.1"
 [6]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_1.png "图2.1 编译过程"
-[7]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_1.png "图2.2 三字母词"
+[7]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_2.png "图2.2 三字母词"
 
 
 
