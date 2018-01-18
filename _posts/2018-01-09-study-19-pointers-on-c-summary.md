@@ -3231,7 +3231,7 @@ register int i1, i2, i3, i4, i5, i6, i7, i8, i9, i10;
 ### 18.1.5 外部标识符的长度
 
 ```c
-//外部名字
+	//外部名字
     int a_very_long_name_to_see_how_long_they_can_be = 1;
 ```
 
