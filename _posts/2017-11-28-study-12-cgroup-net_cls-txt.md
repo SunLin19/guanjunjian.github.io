@@ -21,9 +21,6 @@ tags:
 > 
 > 这个子系统使用等级识别符（classid）标记网络数据包，可允许 Linux 流量控制程序（tc）识别从具体 cgroup 中生成的数据包。
 >
- 
-
-
 
 ## Network priority cgroup
 
@@ -52,6 +49,9 @@ mkdir /sys/fs/cgroup/net_cls/0
 //设置classid，标记group组的网络包标记为10：1，- setting a 10:1 handle.
 echo 0x100001 >  /sys/fs/cgroup/net_cls/0/net_cls.classid  		
 ```
+
+
+
 
 <br/>
 读取时会显示：

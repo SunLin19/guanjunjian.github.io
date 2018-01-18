@@ -19,9 +19,6 @@ tags:
 >  
 > 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
-
-
-
 ## 1. docker client的入口main
 
 ### 1.1 源码
@@ -45,6 +42,9 @@ func main() {
 *  根据dockerCli客户端对象，解析命令行参数，生成带有命令行参数及客户端配置信息的cmd命令行对象
 
 *  根据输入参数args完成命令执行
+
+
+
 
 ### 1.2 流程图
 

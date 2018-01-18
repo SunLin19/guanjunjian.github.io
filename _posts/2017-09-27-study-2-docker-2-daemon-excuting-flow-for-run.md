@@ -19,9 +19,6 @@ tags:
 >  
 > 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
-
-
-
 ## 1. docker daemon的入口main
 
 ### 1.1 源码
@@ -44,6 +41,7 @@ func main() {
 ### 1.2 流程图
 
 ![](/img/study/study-2-docker-2-daemon-excuting-flow-for-run/docker-daemon-main.png)
+
 
 
 

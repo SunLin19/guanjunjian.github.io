@@ -20,9 +20,6 @@ tags:
 > 基于内核4.14.5
 >
 
-
-
-
 ## 1.cls_cgroup_classify
 
 `cls_cgroup_classify`
@@ -47,6 +44,9 @@ static int cls_cgroup_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 	return tcf_exts_exec(skb, &head->exts, res);
 }
 ```
+
+
+
 
 下面进入task_get_classid(skb)
 

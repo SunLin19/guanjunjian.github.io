@@ -18,9 +18,6 @@ tags:
 > [<<Hierachical token bucket theory>>](http://luxik.cdi.cz/~devik/qos/htb/manual/theory.htm)的翻译。
 >
 
-
-
-
 ## 1. 定义
 
 让我们来定义HTB的目标正式。首先是一些定义：
@@ -35,6 +32,9 @@ tags:
        Green: otherwise
 ```
 * D(c)：将会列出所有数据包堆积叶子节点（backlogged leaves），这些数据包堆积叶子节点是c的子孙节点，而这些数据包堆积叶子节点的class和c都是yellow状态。换言之，会列出所有想要从c这个父节点borrow的c的叶子节点。
+
+
+
 
 ## 2. 链路共享的目标
 

@@ -17,9 +17,6 @@ tags:
 >  
 > 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
-
-
-
 ## 1. r.postContainersCreate()
 
 r.postContainersCreate()的实现位于[moby/api/server/router/container/container_routes.go](https://github.com/moby/moby/blob/17.05.x/api/server/router/container/container_routes.go#L362#L396)，代码的主要内容是：
@@ -46,6 +43,9 @@ func (s *containerRouter) postContainersCreate(ctx context.Context, w http.Respo
 	return httputils.WriteJSON(w, http.StatusCreated, ccr)
 }
 ```
+
+
+
 
 其中出现的Config主要目的是基于容器的可移植性信息，与host相互独立，Config 包括容器的基本信息，名字，输入输出流等；非可移植性在 HostConfig 结构体中。
 

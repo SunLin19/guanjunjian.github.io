@@ -19,9 +19,6 @@ tags:
 > 文中图片和日志均出自该博文。
 >
 
-
-
-
 ## 1.简介
 
 本文利用iptables和etables的日志，分析单机容器网络在`Container to Container`、`Local Process to Container`和`Container to External`三种场景下的数据包行走路径。
@@ -33,6 +30,9 @@ tags:
 ![](/img/study/study-15-docker-single-host-network-analysis/1-docker-network-topology.png)
 
 文章基于netfilter数据流图2.来做数据路径分析。
+
+
+
 
 <br/>
 **图2.**

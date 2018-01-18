@@ -17,9 +17,6 @@ tags:
 >本文内容来源于[linux官方文档proc_net_tcp.txt](https://github.com/torvalds/linux/blob/v4.10/Documentation/networking/proc_net_tcp.txt)
 >
 
-
-
-
 ## 1. 官方文档解释
 
 proc_net_tcp.txt介绍了/proc/net/tcp和/proc/net/tcp6接口。这些接口展示了tcp的连接信息。
@@ -44,6 +41,9 @@ proc_net_tcp.txt介绍了/proc/net/tcp和/proc/net/tcp6接口。这些接口展�
    |      |---------------------------> local IPv4 address（本地IP，网络字节序）
    |----------------------------------> number of entry
 ```
+
+
+
 
 `connection state`(套接字状态)，不同的数值代表不同的状态，参照如下：
 

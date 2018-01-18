@@ -17,9 +17,6 @@ tags:
 >  
 > 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
-
-
-
 ## 1. libnetwork工作执行流简介
 
 对libnetwork的工作流做一个梗概。
@@ -31,6 +28,8 @@ tags:
 * 调用ep.Join(sbx)将Endpoint加入指定的Sandbox中，则这个Sandbox也会加入创建Endpoint对应的Network中。
 
 而上面的这部分工作分别在daemon初始化和docker创建时执行，所以下面分别按这两方面再详细分析。
+
+
 
 
 ## 2. libnetwork在docker daemon初始化时的工作

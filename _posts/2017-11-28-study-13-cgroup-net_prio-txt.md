@@ -22,9 +22,6 @@ tags:
 > 这个子系统提供了一种动态控制每个网卡流量优先级的功能
 >
 
-
-
-
 ## Network priority cgroup
 
 -----------------------------------
@@ -41,6 +38,9 @@ Network priority cgroup提供了一个允许管理者动态设置由应用产生
 ```
 # mount -t cgroup -onet_prio none /sys/fs/cgroup/net_prio
 ```
+
+
+
 
 经过上面步骤后，最初的cgroup作为父cgroup，可在`/sys/fs/cgroup/net_prio`中看到，父cgroup包含了系统中的所有task。`/sys/fs/cgroup/net_prio/tasks`列出该cgroup中的所有task。
 

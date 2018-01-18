@@ -21,9 +21,6 @@ tags:
 > cgroup net_cls与tc htb结合使用，达到对cgroup网络资源限制的目的。
 >
 
-
-
-
 ## 简介
 
 Control Groups为聚合/分区task集提供了一种机制，而且这些task的子task也会进入相同的层级的cgroup。cgroup的网络子系统可以提供资源控制从而达到调度资源或实施每个cgroup限制的目的。
@@ -39,6 +36,9 @@ Control Groups为聚合/分区task集提供了一种机制，而且这些task的
 图1：
 
 ![](/img/study/study-14-cgroup-network-control-group/1-architecture.png)
+
+
+
 
 为了尽可能保持架构的简单和非侵入性，当数据包在网络栈中传递的时候，没有将classid存储在数据包中。数据包分类器使用数据包的进程上下文信息（process context information）来查找classid。这样做的缺点是：这种方法是适合在进程上下文中离开网络栈的数据包，例如，这种方法不适合内核生成的数据包（ACKs，ICMP replies等等）或者不适合于数据包在经过数据包分类器之前就进行了排队和重调度的数据包。
 

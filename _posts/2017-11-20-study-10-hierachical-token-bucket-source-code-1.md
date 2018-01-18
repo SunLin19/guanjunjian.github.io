@@ -22,15 +22,15 @@ tags:
 > 内核代码版本为2.6.19.2
 >
 
-
-
-
 ## 1. 输出流控
 
 数据发出流控处理时，上层的所有处理已经完成，数据包已经交到网卡设备进行发送，在数据发送时进行相关的流控处理网络数据的出口函数为dev_queue_xmit()。
 
 图1.输出流控流程：
 ![](/img/study/study-10-hierachical-token-bucket-source-code-1/1-egress-qdisc.png)
+
+
+
 
 ## 2. 网卡设备的qdisc初始化
 

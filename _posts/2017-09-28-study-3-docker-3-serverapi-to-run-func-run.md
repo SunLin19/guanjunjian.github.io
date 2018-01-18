@@ -19,9 +19,6 @@ tags:
 >  
 > 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
-
-
-
 ## 1. initRouter(api, d, c)路由初始化
 
 ### 1.1 源码
@@ -55,6 +52,9 @@ func initRouter(s *apiserver.Server, d *daemon.Daemon, c *cluster.Cluster) {
 	s.InitRouter(debug.IsEnabled(), routers...)  
 }
 ```
+
+
+
 
 ### 1.2 流程图
 

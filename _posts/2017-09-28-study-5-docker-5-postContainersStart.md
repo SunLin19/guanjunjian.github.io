@@ -17,9 +17,6 @@ tags:
 >  
 > 源码阅读基于docker [version1.17.05.x](https://github.com/moby/moby/tree/17.05.x)。
 
-
-
-
 ## 1. r.postContainersStart()
 
 ### 1.1 源码
@@ -39,6 +36,9 @@ func (s *containerRouter) postContainersStart(ctx context.Context, w http.Respon
 ### 1.2 流程图
 
 ![](/img/study/study-5-docker-5-postContainersStart/docker-daemon-postContainersStart.png)
+
+
+
 
 下面2.分析`ContainerStart()`函数。
 
