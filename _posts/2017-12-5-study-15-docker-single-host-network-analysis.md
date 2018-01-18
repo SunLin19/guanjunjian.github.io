@@ -106,7 +106,7 @@ num   pkts bytes target     prot opt in     out     source               destina
 <br/>
 [输出日志](https://github.com/guanjunjian/guanjunjian.github.io/blob/master/img/study/study-15-docker-single-host-network-analysis/docker-bridge-network-demo-iptables-trace-log.txt)
 
-Trace target在数据包match table、chains的policy或rules时会输出日志，日志格式：”TRACE:tablename:chainname:type:rulenum”。当匹配到的是普通rules时，type=”rule”;当碰到一个user-defined chain的return target时，type=”return”；当匹配到built-in chain(比如：PREROUTING、INPUT、OUTPUT、FORWARD和POSTROUTING)的default policy时，type=”policy”。[参考1]
+Trace target在数据包match table、chains的policy或rules时会输出日志，日志格式："TRACE:tablename:chainname:type:rulenum"。当匹配到的是普通rules时，type="rule";当碰到一个user-defined chain的return target时，type="return"；当匹配到built-in chain(比如：PREROUTING、INPUT、OUTPUT、FORWARD和POSTROUTING)的default policy时，type="policy"。[参考1]
 
 
 ## 2.Container to Container
