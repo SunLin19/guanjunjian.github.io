@@ -2965,4 +2965,523 @@ rear = ( rear + 1 ) % QUEUE_SIZE;
 
 ---
 
+# 第18章 运行时环境
+
+## 18.1 判断运行时环境
+
+-   第1步：从你的编译器获得一个汇编语言列表
+-   第2步：阅读你的机器上的汇编语言代码
+
+### 18.1.1 测试程序
+
+-   C代码
+
+```c
+//静态初始化
+int static_variable = 5;
+
+void f()
+{
+    register int i1, i2, i3, i4, i5, i6, i7, i8, i9, i10;
+    register char *c1, *c2, *c3, *c4, *c5, *c6, *c7, *c8, *c9, *c10;
+    extern inta_very_long_name_to_see_how_long_they_can_be;
+    double dbl;
+    intfunc_ret_int();
+    double func_ret_double();
+    char *func_ret_char_ptr();
+    
+    //寄存器变量的最大数量
+    i1 = 1; i2 = 2; i3 = 3; i4 = 4; i5 = 5;
+    i6 = 6; 71 = 7; i8 = 8; i9 = 9; i10 = 10;
+    c1 = (char *)110; c2 = (char*)120;
+    c3 = (char *)130; c4 = (char*)140;
+    c5 = (char *)150; c6 = (char*)160;
+    c7 = (char *)170; c8 = (char*)180;
+    c9 = (char *)190; c10 = (char*)200;
+    
+    //外部名字
+    int a_very_long_name_to_see_how_long_they_can_be = 1;
+    
+    //函数调用/返回协议，堆栈帧（过程活动记录）
+    i2 = func_ret_int( 10, i1, i10 );
+    db1 = func_ret_double();
+    c1 = func_ret_char_ptr( c1 );
+}
+
+int
+func_ret_int( int a, int b, register int c )
+{
+    int d;
+    
+    d = b - 6;
+    return a + b + c;
+}
+
+double 
+func_ret_double()
+{
+    return 3.14;
+}
+
+char *
+func_ret_char_ptr( char *cp )
+{
+    return cp + 1;
+}
+```
+
+-   汇编代码
+
+```
+    .data
+    .even
+    .global _static_variable
+_static_variable:
+    .long 5
+    .text
+    
+    .globl _f
+_f: 
+    link   a6, #-88
+    moveml #0x3cfc,sp@
+    moveq  #1,d7
+    moveq  #2,d6
+    moveq  #3,d5
+    moveq  #4,d4
+    moveq  #5,d3
+    moveq  #6,d2
+    movl   #7,a6@(-4)
+    movl   #8,a6@(-8)
+    movl   #9,a6@(-12)
+    movl   #10,a6@(-16)
+    movl   #110,a5
+    movl   #120,a4
+    movl   #130,a3
+    movl   #140,a2
+    movl   #150,a6@(-20)
+    movl   #160,a6@(-24)
+    movl   #170,a6@(-28)
+    movl   #180,a6@(-32)
+    movl   #190,a6@(-36)
+    movl   #200,a6@(-40)
+    movl   #1,_a_very_long_name_to_see_how_long_they_can_be
+    movl   a6@(-16),sp@-
+    movl   d7,sp@-
+    pea    10
+    jpsr   _func_ret_int
+    lea    sp@(12),sp
+    movl   d0,d6
+    jpsr   _func_ret_double
+    movl   d0,a6@(-48)
+    movl   d1,a6@(-44)
+    pea    a5@
+    jpsr   _func_ret_char_ptr
+    addqw  #4,sp
+    movl   d0,a5
+    moveml a6@(-88),#0x3cfc
+    unlk   a6
+    rts
+    
+    .globl _func_ret_int
+_func_ret_int:
+    link   a6, #-8
+    moveml #0x80,sp@
+    movl   a6@(16),d7
+    movl   a6@(12),d0
+    subql  #6,d0
+    movl   d0,a6@(-4)
+    movl   a6@(8),d0
+    addl   a6@(12),d0
+    addl   d7,d0
+    moveml a6@(-8),#0x80
+    unlk   a6
+    rts
+    
+    .globl _func_ret_double
+_func_ret_double:
+    link   a6, #0
+    moveml #0,sp@
+    movl   L2000000,d0
+    movl   L2000000+4,d1
+    unlk   a6
+    rts
+L2000000:.long  0x40091eb8,0x51eb851f
+
+    .globl _func_ret_char_ptr
+_func_ret_char_ptr:
+    link   a6, #0
+    moveml #0,sp@
+    movl   a6@(8),d0
+    addql  #1,d0
+    unlk   a6
+    rts
+```
+
+### 18.1.2 静态变量和初始化
+
+```c
+//静态初始化
+int static_variable = 5;
+```
+
+```
+    .data   //进入程序的数据区
+    .even   //确保变量开始于内存的偶数地址
+    .global _static_variable    //变量被声明为全局类型，变量名以下划线开始
+_static_variable:   //编译器为变量创建空间
+    .long 5     //进行初始化
+```
+
+### 18.1.3
+
+-   一个函数分为三个部分：
+    -   函数序：用于执行函数启动需要的一些工作,如为局部变量保留堆栈中的内存
+    -   函数体：用于执行有用工作的地方
+    -   函数跋：用于在函数即将返回之前清理堆栈
+
+```c
+void f()
+{
+    register int i1, i2, i3, i4, i5, i6, i7, i8, i9, i10;
+    register char *c1, *c2, *c3, *c4, *c5, *c6, *c7, *c8, *c9, *c10;
+    extern inta_very_long_name_to_see_how_long_they_can_be;
+    double dbl;
+    intfunc_ret_int();
+    double func_ret_double();
+    char *func_ret_char_ptr();
+```
+
+```
+    .text   //表示进入程序的代码（文本）段
+    
+    .globl _f   //函数名的全局声明，也有下划线
+_f: 
+    link   a6, #-88     //第1条可执行指令，为函数创建堆栈帧，堆栈帧是堆栈中的一个区域，函数在那里存储变量和其他值（寄存器），link在堆栈帧中保留了88个字节的空间，用于存储局部变量和其他值
+    /*
+    把指定寄存器中的旧值复制到堆栈中，68000处理器有8个用于操作数据的寄存器,d0至d7；8个用于操作地址的寄存器，a0至a7
+    0x3cfc即二进制0011110011111100，分别表示[a7,a6,a5,a4,a3,a2,a1,a0,d7,d6,d5,d4,d3,d2,d1,d0]的使用情况
+    可以看到d2至d7、a2至a5需要被存储，被存储的即时“其他值”
+    */
+    moveml #0x3cfc,sp@  
+```
+
+-   局部变量声明和函数原型不会产生任何汇编代码,所以下面这些C代码不会产生汇编代码。
+
+```c
+register int i1, i2, i3, i4, i5, i6, i7, i8, i9, i10;
+    register char *c1, *c2, *c3, *c4, *c5, *c6, *c7, *c8, *c9, *c10;
+    extern inta_very_long_name_to_see_how_long_they_can_be;
+    double dbl;
+    intfunc_ret_int();
+    double func_ret_double();
+    char *func_ret_char_ptr();
+```
+
+-   如果任何局部变量在声明时进行了初始化，那么这里也会出现指令用于执行赋值操作
+
+### 18.1.4 寄存器变量
+
+```c
+    //寄存器变量的最大数量
+    i1 = 1; i2 = 2; i3 = 3; i4 = 4; i5 = 5;
+    i6 = 6; 71 = 7; i8 = 8; i9 = 9; i10 = 10;
+    c1 = (char *)110; c2 = (char*)120;
+    c3 = (char *)130; c4 = (char*)140;
+    c5 = (char *)150; c6 = (char*)160;
+    c7 = (char *)170; c8 = (char*)180;
+    c9 = (char *)190; c10 = (char*)200;
+```
+
+```
+    moveq  #1,d7    //值1至6倍存放在数据寄存器，最多只有6个整型值可以被存放在数据寄存器
+    moveq  #2,d6
+    moveq  #3,d5
+    moveq  #4,d4
+    moveq  #5,d3
+    moveq  #6,d2
+    /*
+    7至10倍存放在其他地方
+    a6称为帧指针，它指向堆栈帧内部的一个“引用”位置，堆栈中的所有值都是通过这个引用位置加上一个偏移量进行访问的
+    a6@(-4)表示偏移地址-4
+    使用偏移地址，可以建立一张映射表，准地地显示堆栈中的每个值相对于帧指针a6的位置
+    */
+    movl   #7,a6@(-4)   
+    movl   #8,a6@(-8)
+    movl   #9,a6@(-12)
+    movl   #10,a6@(-16)
+    movl   #110,a5      //前4个值被存放在地址寄存器，最多运行4个指针变量放在寄存器，指针的长度是固定的，任何类型的指针都可以放在寄存器中
+    movl   #120,a4
+    movl   #130,a3
+    movl   #140,a2
+    movl   #150,a6@(-20)    //被存放在其他地方
+    movl   #160,a6@(-24)
+    movl   #170,a6@(-28)
+    movl   #180,a6@(-32)
+    movl   #190,a6@(-36)
+    movl   #200,a6@(-40)
+```
+
+-   前面提到的`moveml #0x3cfc,sp@`即是将寄存器的旧值保存到堆栈中，函数必须对任何将用于存储寄存器变量的寄存器进行保存，这样它们原先的值可以在函数返回到调用函数前恢复，即`moveml a6@(-88),#0x3cfc`语句，这样就能保留调用函数的寄存器变量
+-   d0-d1、a0-a1以及a6-a7并未用于存储寄存器
+    -   a6用作帧指针
+    -   a7是堆栈指针（别名SP）
+    -   d0、d1用于从函数返回值
+    -   a0、a1用于其他某种目的
+
+### 18.1.5 外部标识符的长度
+
+```c
+//外部名字
+    int a_very_long_name_to_see_how_long_they_can_be = 1;
+```
+
+```
+    movl   #1,_a_very_long_name_to_see_how_long_they_can_be
+```
+
+-   外部名字的最终限制是链接器施加的，它很可能接收任何长度的名字但忽略除前几个字符以外的其他字符
+
+### 18.1.6 判断帧布局
+
+-   运行时堆栈保存了每个函数运行时所需要的数据，包括它的自动变量和返回值
+-   下面将分析两个部分
+    -   堆栈帧的组织形式
+    -   调用和从函数返回的协议
+
+#### 一、传递函数参数
+
+```c
+//函数调用/返回协议，堆栈帧（过程活动记录）
+    i2 = func_ret_int( 10, i1, i10 );
+```
+
+```
+    movl   a6@(-16),sp@-    //i10存在a6@(-16)，所以是把参数i10压入堆栈
+    movl   d7,sp@-  //i1存在d7，所以是把i1压入堆栈
+    pea    10   //pea指令简单地把它的操作数压入堆栈，所以这里将参数10压入堆栈
+    /*
+    跳转子程序，把返回值压入到堆栈中，并跳转到_func_ret_int的起始位置
+    当被调用函数结束任务后需要返回到它的调用位置，需要用到压入到堆栈中的返回值
+    堆栈的情况如图18.2所示
+    */
+    jpsr   _func_ret_int    
+```
+
+-   图18.1显示了到目前为止所创建的内容
+    -   低内存地址位于顶部而高内存地址位于底部
+    -   当值压入堆栈时，堆栈向低地址方向生长（向上）
+    -   在原先的堆栈指针以下的内容是未知的
+
+![][1]
+
+![][2]
+
+#### 二、函数序
+
+-   接下来，执行流来到被调用函数的函数序：
+
+```c
+int
+func_ret_int( int a, int b, register int c )
+{
+    int d;
+```
+
+```
+    .globl _func_ret_int
+_func_ret_int:
+    /*
+    link指令分成三步
+    1.a6的内容被压入到堆栈中（旧的a6值被压入）
+    2.堆栈指针的当前值被复制到a6（SP），图18.3显示了目前为止的堆栈帧状态
+    3.link指令从堆栈指针中减去8，这将创建空间用于保存局部变量和被保存的寄存器的旧值，图18.4显示了目前为止的堆栈帧状态
+    */
+    link   a6, #-8
+    /*
+    0x80二进制为10000000，表示[d7,d6,d5,d4,d3,d2,d1,d0]的使用情况，所以这里是把d7寄存器的旧址存储在堆栈的顶部，它提示堆栈帧的顶部就是寄存器值保存的位置
+    */
+    moveml #0x80,sp@    
+    /*
+    从堆栈把第三个参数复制到d7，因为第三个参数声明为寄存器变量
+    从图18.4.1可以看到参数的偏移值
+    */
+    movl   a6@(16),d7   
+```
+
+![][3]
+
+![][4]
+
+-   图18.4.1如下
+
+![][5]
+
+#### 三、堆栈中的参数次序
+
+-   被调用函数使用帧指针（a6）加一个偏移量来访问参数
+-   当参数以反序压入到堆栈时，参数列表的第1个参数便位于堆栈中这堆参数的顶部，它距离帧指针的偏移量是一个常数。任何一个参数距离帧指针的偏移量都是一个常数，这和堆栈中压入多少个参数并无关系
+-   如果参数以相反的顺序（正序）压入到堆栈中，第1个参数距离帧指针的偏移量就和压入到堆栈的参数数量有关
+
+#### 四、最终的堆栈布局
+
+```c
+    d = b - 6;
+    return a + b + c;
+}
+```
+
+```
+    movl   a6@(12),d0   //把第2个参数复制到d0，即参数b
+    subql  #6,d0    //将d0中的值减去6，即 b - 6
+    movl   d0,a6@(-4)   //将结果存储到布局变量d，即 d = b - 6
+    movl   a6@(8),d0    //将a的值放到d0
+    addl   a6@(12),d0   //将a6@(12)的值与d0相加，即 a + b
+    addl   d7,d0    //将d7中的值与d0相加，即 a + b + c，这个运行结果存放在d0中，之后return的时候会用到
+    ------------------------------------从下面开始为函数跋
+    moveml a6@(-8),#0x80
+    unlk   a6
+    rts
+```
+
+-   从上面可以看出，d0的作用，其实d0主要有两个作用，这两个作用也是它不能用于存放寄存器变量的原因之一：
+    -   计算过程中的“中间结果暂存器”或临时位置，即上面汇编代码中看到的
+    -   存返回值，后文将看到
+
+#### 五、函数跋
+
+```
+    /*
+    用于恢复以前被保存的寄存器值
+    如图18.4.1所示，a6@(-8)指向寄存器旧值
+    将这个旧值恢复到d7中
+    */
+    moveml a6@(-8),#0x80    
+    unlk   a6   //把a6的值复制给堆栈指针SP，并把从堆栈中弹出的a6旧值装入a6中，这时SP指向原a6@(0)位置
+    rts     //通过把返回地址从堆栈中弹出到程序计数器，从而从该函数返回，这时SP指向原a6@(4)位置
+```
+
+-   下面执行流将从调用程序的地点继续。注意此时堆栈尚未被完全清空（参数还没清空）
+
+```c
+    i2 = func_ret_int( 10, i1, i10 );
+```
+
+```
+    /*
+    把12加到堆栈指针，在此之前SP指向原a6@(4)，在此之后SP指向原a6@(16)
+    三个参数值从堆栈中弹出
+    在此之前，被调用函数并没有从堆栈中完全清除它的整个堆栈帧，参数还留在那里等待调用函数清除
+    */
+    lea    sp@(12),sp
+    movl   d0,d6    //把d0的值复制到d6中，即把d0的值复制到变量i2
+```
+
+#### 六、返回值
+
+-   函数跋并没有使用d0，因此它依然保存着函数的返回值
+-   函数返回一个值时把它放在d0，这是d0不能用于存放寄存器变量的另一个原因
+
+<br/>
+
+-   下一个被调用的函数返回一个double值
+
+```c
+    db1 = func_ret_double();
+    c1 = func_ret_char_ptr( c1 );
+```
+
+```
+    /*
+    这个函数没有任何参数，所以没有什么东西被压入到堆栈中
+    */
+    jpsr   _func_ret_double
+    /*
+    double长度是8个字节，无法放入一个寄存器中
+    因此要返回这种类型的值，必须同时使用d0和d1寄存器
+    */
+    movl   d0,a6@(-48)  
+    movl   d1,a6@(-44)
+    
+    //函数_func_ret_char_ptr说明了指针变量是如何返回的
+    pea    a5@  //将参数c1压入堆栈
+    jpsr   _func_ret_char_ptr   //跳转子程序
+    addqw  #4,sp    //将参数c1弹出堆栈
+    movl   d0,a5    //将返回值复制到a5，即变量c1
+```
+
+### 18.1.7 表达式的副作用
+
+```c
+//尽管这个函数存在一个巨大错误，但仍然能在某些机器上正确地运行
+int
+erroneous( int a, int b )
+{
+    int x;
+    
+    x = a + b;
+    //这里返回语句没有指定返回哪个变量的值
+    return;
+}
+```
+
+-   这个函数实际上可以返回计算结果的值
+-   d0被用于计算x，并且由于这个表达式是最后进行求值的，所以当函数结束时d0仍然保存了这个结果值
+-   这个函数很意外地调用函数返回了正确的值
+-   若在return语句之前加入`a + 3;`，那么d0倍修改，就会返回错误的值
+
+---
+
+## 18.2 C和汇编语言的接口
+
+-   为了编写能够调用C程序或被C程序调用的汇编语言，必须遵守的规则
+    -   汇编程序中的名字必须遵循外部标识符的规则，例如以一个下划线开始
+    -   汇编程序必须遵循正确的函数调用/返回协议
+-   为了编写一个由C程序调用的汇编程序
+    -   保存任何你希望修改的寄存器（除d0、d1、a0和a1之外）
+    -   参数值从堆栈中获得，因为调用它的C函数把参数压入到堆栈中
+    -   如果函数应该返回一个值，它的值应该保存在d0中（在这种情况下，d0不能进行保存和恢复）
+    -   在返回之前，函数必须清除任何它压入到堆栈中的内容
+-   在一个由C程序调用的汇编程序里，你必须访问C函数放置在那里的参数
+-   以下为C程序调用汇编程序的例子
+
+```c
+//C代码
+sum = sum_three_values( 25, 14, -6 );
+```
+
+```
+//汇编代码
+    .text
+    
+    .globl  _sum_three_values
+_sum_three_values:
+    movl    sp@(4),d0   //第1个参数复制到d0中
+    addl    sp@(8),d0   //d0与第2个参数相加
+    addl    sp@(12),d0  //d0与第2个参数相加
+    rts                 //函数返回
+```
+
+---
+
+## 18.3 运行时效率
+
+-   虚拟内存是由操作系统实现的，它需要把程序的活动部分放入内存并把不活动的部分复制到磁盘中，这样就允许系统允许大型的程序
+-   由于虚拟内存，随着程序的增大，它的执行效率逐渐降低
+
+---
+
+## 18.5 警告的总结
+
+-   是链接器而不是编译器决定外部标识符的最大长度
+-   你无法链接由不同编译器产生的程序
+
+---
+
+[1]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_1.png "图18.1 压入参数后的堆栈帧"
+[2]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_2.png "图18.2 在跳转子程序指令之后的堆栈帧"
+[3]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_3.png "图18.3 link指令期间的堆栈帧"
+[4]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_4.png "图18.4 link指令之后的堆栈帧"
+[5]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_4_1.png "图18.4.1"
+
+
 
