@@ -13,11 +13,122 @@ tags:
 {:toc}
 
 >
-> 《C和指针》 知识要点总结，持续更新
+> 《C和指针》 知识要点总结
 >
 
 
 
+
+# 第2章 基本概念
+
+## 2.1 环境
+
+-   ANSI C存在两种不同的环境
+    -   翻译环境：源代码被转换为可执行的机器指令
+    -   执行环境：用于实际执行代码
+-   两种环境不必位于同一台机器上，例如交叉编译器
+
+### 2.1.1 翻译 
+
+-   翻译分为以下几个步骤，图2.1描述了这个过程
+    -   组成一个程序的每个（可能有多个）源文件通过编译过程分别转换为目标代码（object code）
+    -   各个目标文件由链接器捆绑在一起，形成一个单一而完整的可执行程序。链接器会引入标准C库中的函数和程序员个人的程序库
+
+![][6]
+
+-   编译也分为以下几个步骤
+    -   预处理器处理，在源代码上执行一些文本操作，例如`#define`和`#include`指令的执行   
+    -   源代码解析，这个阶段产生绝大多数错误和警告信息，随后产生目标代码
+    -   优化器对目标代码进行进一步处理，提升效率
+
+#### 一、文件名约定
+
+-   C源代码以`.c`扩展名保存，头文件使用`.h`扩展名保存
+-   目标文件名：在UNIX中扩展名为`.o`，在MS-DOS中为`.obj`
+
+#### 二、编译和链接
+
+-   在UNIX中，C编译器被称为cc
+-   cc有以下几种方法调用：
+    -   编译并链接一个完全包含一个源文件的C程序：`cc program.c`，该命令会产生a.out可执行文件，中间会生成program.o目标文件，但在链接过程完成后会被删除
+    -   编译并链接几个C源文件`cc main.c sort.c lookup.c`，当源文件超过一个时，目标文件便不会被删除
+    -   编译一个C源文件，并把它和现存的目标文件链接在一起`cc main.o lookip.o sort.c`
+    -   编译单个C源文件，并产生一个目标文件（本例中为program.o）：`cc -c program.c`
+    -   编译几个C源文件，为每个文件产生一个目标文件：`cc -c main.c sort.c lookup.c`
+    -   链接几个目标文件：`cc main.o sort.o lookup.o`
+-   以上的cc命令还可以加上`-o name`使链接器把可执行程序保存在`name`文件中，而不是`a.out`
+-   MS-DOC与UNIX不同：
+    -   它的名字是bcc
+    -   目标文件的名字是file.obj
+    -   当单个源文件被编译并链接时，编译器并不删除目标文件
+    -   在缺省情况下，可执行文件以命令行第一个源或目标文件名命名，可以使用`-e name`把可执行程序命名为`name.exe`
+
+### 2.1.2 执行
+
+-   执行过程分为：
+    -   程序载入内存，由操作系统完成，那些**不是存储在堆栈中**的尚未初始化的变量将在这个时候得到初始值
+    -   执行开始，执行小型启动程序，完成系列日常任务，然后调用main函数
+    -   开始执行程序代码
+    -   程序终止，“正常”环境的终止就是main函数的返回
+
+---
+
+## 2.2 词法规则
+
+### 2.2.1
+
+-   三字母词：就是几个字符的序列，合并起来表示另一个字符，如下图所示：
+
+![][7]
+
+-   转义序列（escape sequence）或字符转义（character escape），由反斜杠`\`加上一或多个其他字符组成
+
+```
+//转义字符
+    \? 在书写连续多个问号时使用，防止它们被解释为三字母词
+    \" 用于表示一个字符串常量内部的双引号
+    \' 用于表示字符常量`
+    \\ 用于表示一个反斜杠，防止它被解释为一个转义字符
+    \a 警告字符，它将奏响终端铃声或产生其他一些可听见或可看见的信息
+    \b 退格键
+    \f 进纸字符，换页
+    \n 换行符
+    \r 回车符
+    \t 水平制表符
+    \v 垂直制表符
+    \ddd ddd表示1~3个八进制数字，表示的字符就是给定的八进制值所代表的字符
+    \xddd 与上类似，表示十六进制
+```
+
+### 2.2.2 注释
+
+-   注释不能嵌套于另一个注释中
+
+### 2.2.3 自由形式的源代码
+
+-   预处理是以行定位的
+
+---
+
+## 2.3 程序风格
+
+-   在函数定义中，返回类型出现于独立的一行中，而函数名则在下一行的起始处
+
+## 2.4 总结
+
+-   一个函数只能完整地出现在另一个源文件中
+-   程序必须载入内存中才能执行，在宿主式环境中，这个任务由操作系统完成；在自由式环境中，程序常常永久存储于ROM中
+-   经过初始化的静态变量在程序执行之前能获得它们的值
+-   注释将被预处理器去除
+-   标识符由字母、数字和下划线组成，但不能以数字开头
+
+---
+
+## 2.5 警告的总结
+
+-   字符串常量中的字符被错误地解释为三字母词
+
+---
 
 # 第3章 数据
 
@@ -3482,6 +3593,8 @@ _sum_three_values:
 [3]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_3.png "图18.3 link指令期间的堆栈帧"
 [4]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_4.png "图18.4 link指令之后的堆栈帧"
 [5]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_18_4_1.png "图18.4.1"
+[6]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_1.png "图2.1 编译过程"
+[7]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_1.png "图2.2 三字母词"
 
 
 
