@@ -1,0 +1,91 @@
+rar表：
+root@ubuntu2:~# iptables -nL --line-numbers -v -t raw
+Chain PREROUTING (policy ACCEPT 13 packets, 1028 bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+1        0     0 TRACE      udp  --  *      *       0.0.0.0/0            0.0.0.0/0            udp spts:!7946:8301 dpts:!7946:8301
+
+Chain OUTPUT (policy ACCEPT 11 packets, 1708 bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+1        0     0 TRACE      udp  --  *      *       0.0.0.0/0            0.0.0.0/0            udp spts:!7946:8301 dpts:!7946:8301
+
+---------------------------------------------------------
+
+filter表
+root@ubuntu2:~# iptables -nL --line-numbers -v -t filter
+Chain INPUT (policy ACCEPT 11503 packets, 1811K bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+
+Chain FORWARD (policy DROP 0 packets, 0 bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+1        0     0 DOCKER-USER  all  --  *      *       0.0.0.0/0            0.0.0.0/0           
+2        0     0 DOCKER-ISOLATION  all  --  *      *       0.0.0.0/0            0.0.0.0/0           
+3        0     0 ACCEPT     all  --  *      docker0  0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+4        0     0 DOCKER     all  --  *      docker0  0.0.0.0/0            0.0.0.0/0           
+5        0     0 ACCEPT     all  --  docker0 !docker0  0.0.0.0/0            0.0.0.0/0           
+6        0     0 ACCEPT     all  --  docker0 docker0  0.0.0.0/0            0.0.0.0/0           
+7        0     0 ACCEPT     all  --  *      docker_gwbridge  0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+8        0     0 DOCKER     all  --  *      docker_gwbridge  0.0.0.0/0            0.0.0.0/0           
+9        0     0 ACCEPT     all  --  docker_gwbridge !docker_gwbridge  0.0.0.0/0            0.0.0.0/0           
+10       0     0 DROP       all  --  docker_gwbridge docker_gwbridge  0.0.0.0/0            0.0.0.0/0           
+
+Chain OUTPUT (policy ACCEPT 11910 packets, 2343K bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+
+Chain DOCKER (2 references)
+num   pkts bytes target     prot opt in     out     source               destination         
+
+Chain DOCKER-ISOLATION (1 references)
+num   pkts bytes target     prot opt in     out     source               destination         
+1        0     0 DROP       all  --  docker_gwbridge docker0  0.0.0.0/0            0.0.0.0/0           
+2        0     0 DROP       all  --  docker0 docker_gwbridge  0.0.0.0/0            0.0.0.0/0           
+3        0     0 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0           
+
+Chain DOCKER-USER (1 references)
+num   pkts bytes target     prot opt in     out     source               destination         
+1        0     0 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0   
+
+-----------------------------------------
+
+mangle表
+
+root@ubuntu2:~# iptables -nL --line-numbers -v -t mangle
+Chain PREROUTING (policy ACCEPT 9427 packets, 1456K bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+
+Chain INPUT (policy ACCEPT 9427 packets, 1456K bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+
+Chain FORWARD (policy ACCEPT 0 packets, 0 bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+
+Chain OUTPUT (policy ACCEPT 9707 packets, 1890K bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+
+Chain POSTROUTING (policy ACCEPT 9710 packets, 1890K bytes)
+num   pkts bytes target     prot opt in     out     source               destination   
+
+-----------------------------------
+
+nat表
+
+root@ubuntu2:~# iptables -nL --line-numbers -v -t nat
+Chain PREROUTING (policy ACCEPT 130 packets, 8142 bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+1      128  8088 DOCKER     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ADDRTYPE match dst-type LOCAL
+
+Chain INPUT (policy ACCEPT 130 packets, 8142 bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+
+Chain OUTPUT (policy ACCEPT 147 packets, 10118 bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+1        0     0 DOCKER     all  --  *      *       0.0.0.0/0           !127.0.0.0/8          ADDRTYPE match dst-type LOCAL
+
+Chain POSTROUTING (policy ACCEPT 147 packets, 10118 bytes)
+num   pkts bytes target     prot opt in     out     source               destination         
+1        0     0 MASQUERADE  all  --  *      !docker0  172.17.0.0/16        0.0.0.0/0           
+2        2    88 MASQUERADE  all  --  *      !docker_gwbridge  172.18.0.0/16        0.0.0.0/0           
+
+Chain DOCKER (2 references)
+num   pkts bytes target     prot opt in     out     source               destination         
+1        0     0 RETURN     all  --  docker0 *       0.0.0.0/0            0.0.0.0/0           
+2        0     0 RETURN     all  --  docker_gwbridge *       0.0.0.0/0            0.0.0.0/0   
