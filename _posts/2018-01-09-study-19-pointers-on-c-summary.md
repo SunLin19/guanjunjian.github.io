@@ -159,8 +159,6 @@ tags:
 -   整型字面值属于哪种类型，取决于字面值是如何书写的，可以通过添加一个后缀来改变缺省的规则
 -   在整数字面值后面添加L或l使这个整数解释为long整型值；U或u解释为unsigned整型值；可两个一起用
 
-</br>
-
 -   十进制整型字面值可能是`int、long或unsigend long`，缺省是它最短类型但能完整容纳这个值
 -   八进制和十六进制整型字面值可能是`int、unsigend int、long或unsigend long`，，缺省是它最短类型但能完整容纳这个值
 -   字符常量的类型总是`int`，不能添加unsigned或long后缀
