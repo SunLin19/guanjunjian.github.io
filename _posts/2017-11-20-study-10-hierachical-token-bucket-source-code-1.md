@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study10.HTB源码分析1---Qdisc"
+title:      "「十」HTB源码分析1 Qdisc结构"
 date:       2017-11-20 11:00:00 
 author:     "guanjunjian"
 categories: 网络流量控制

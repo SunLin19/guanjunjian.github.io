@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study2.docker源码阅读之二---docker daemon启动流程 "
+title:      "「二」DOCKER源码分析2 docker daemon启动流程 "
 date:       2017-9-27 18:00:00 
 author:     "guanjunjian"
 categories: Docker源码阅读

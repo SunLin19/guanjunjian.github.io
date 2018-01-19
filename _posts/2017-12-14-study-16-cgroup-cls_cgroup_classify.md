@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study16.[net_cls]cls_cgroup_classify()分析---classid的存储"
+title:      "「十六」Cgourp子系统net_cls cls_cgroup_classify()源码分析"
 date:       2017-12-14 15:00:00
 author:     "guanjunjian"
 categories: 网络流量控制
@@ -15,8 +15,10 @@ tags:
 {:toc}
 
 >
-> 了解该函数的目的是根据[net_next](https://lists.linuxfoundation.org/pipermail/containers/2014-January/033844.html)
->
+> 了解该函数的目的是根据[net_next](https://lists.linuxfoundation.org/pipermail/containers/2014-January/033844.html)中提出：tc无法捕捉veth转发后的数据包，是因为classid被清空导致的
+> 
+> 所以这篇博客的目的是了解veth转发的过程，并发现classid存储位置 
+> 
 > 基于内核4.14.5
 >
 

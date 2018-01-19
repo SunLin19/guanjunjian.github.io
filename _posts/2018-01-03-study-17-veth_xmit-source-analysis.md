@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study17.veth_xmit分析"
+title:      "「十七」Linux虚拟网络设备veth veth_xmit源码分析"
 date:       2018-01-03 10:00:00
 author:     "guanjunjian"
 categories: 网络源码分析
@@ -16,7 +16,7 @@ tags:
 > 基于内核4.14.5
 >
 > 目的是了解veth的数据包转发流程，了解classid是在何处被丢弃的
-
+> 
 
 ## 1. 使用方法
 

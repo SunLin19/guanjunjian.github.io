@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study13.net_prio文档--------net_prio.txt「译」"
+title:      "「十三」Cgroup子系统 net_prio文档"
 date:       2017-11-28 17:00:00 
 author:     "guanjunjian"
 categories: 网络流量控制

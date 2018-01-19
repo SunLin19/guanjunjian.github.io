@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study12.net_cls文档--------net_cls.txt「译」"
+title:      "「十二」Cgroup子系统 net_cls文档"
 date:       2017-11-28 15:00:00 
 author:     "guanjunjian"
 categories: 网络流量控制

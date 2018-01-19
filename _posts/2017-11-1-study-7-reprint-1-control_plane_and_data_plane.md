@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study7.[转]控制平面和数据平面"
+title:      "「七」[转]控制平面和数据平面"
 date:       2017-11-1 11:00:00 
 author:     "guanjunjian"
 categories: 网络基础知识

@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "study14.CONTROLLING NETWORK RESOURCES USING CONTROL GROUPS「译」"
+title:      "「十四」利用Cgroup限制网络带宽"
 date:       2017-11-29 11:00:00 
 author:     "guanjunjian"
 categories: 网络流量控制
@@ -16,7 +16,7 @@ tags:
 {:toc}
 
 >
-> [CONTROLLING NETWORK RESOURCES USING CONTROL GROUPS](http://vger.kernel.org/netconf2009_slides/Network%20Control%20Group%20Whitepaper.odt)的翻译。
+> 本文是对[CONTROLLING NETWORK RESOURCES USING CONTROL GROUPS](http://vger.kernel.org/netconf2009_slides/Network%20Control%20Group%20Whitepaper.odt)的翻译。
 > 
 > cgroup net_cls与tc htb结合使用，达到对cgroup网络资源限制的目的。
 >
