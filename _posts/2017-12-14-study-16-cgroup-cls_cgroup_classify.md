@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "「十六」Cgourp子系统net_cls cls_cgroup_classify()源码分析"
+title:      "「十六」Cgourp子系统net_cls cls_cgroup_classify源码分析"
 date:       2017-12-14 15:00:00
 author:     "guanjunjian"
 categories: 网络流量控制

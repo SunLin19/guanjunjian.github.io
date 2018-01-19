@@ -3,7 +3,7 @@ layout:     post
 title:      "「十九」《C和指针》要点提炼"
 date:       2018-01-09 10:00:00
 author:     "guanjunjian"
-categories: 读书
+categories: 阅读
 tags:
     - study
     - summary

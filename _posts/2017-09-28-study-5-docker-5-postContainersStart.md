@@ -3,7 +3,7 @@ layout:     post
 title:      "「五」DOCKER源码分析5 daemon端对container start的处理"
 date:       2017-9-28 20:30:00 
 author:     "guanjunjian"
-categories: Docker源码阅读
+categories: DOCKER源码分析
 tags:
     - docker_run
     - network

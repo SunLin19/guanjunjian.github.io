@@ -3,7 +3,7 @@ layout:     post
 title:      "「八」Linux文件/proc/net/tcp分析"
 date:       2017-11-9 11:00:00 
 author:     "guanjunjian"
-categories: 网络基础知识
+categories: 网络基础
 tags:
     - network
     - study

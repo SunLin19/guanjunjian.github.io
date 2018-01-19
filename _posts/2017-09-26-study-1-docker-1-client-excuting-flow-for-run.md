@@ -3,7 +3,7 @@ layout:     post
 title:      "「一」DOCKER源码分析1 docker client命令行执行流程 "
 date:       2017-9-26 22:40:00 
 author:     "guanjunjian"
-categories: Docker源码阅读
+categories: DOCKER源码分析
 tags:
     - docker_run
     - network

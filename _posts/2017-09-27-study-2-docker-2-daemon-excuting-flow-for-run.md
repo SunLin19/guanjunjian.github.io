@@ -3,7 +3,7 @@ layout:     post
 title:      "「二」DOCKER源码分析2 docker daemon启动流程 "
 date:       2017-9-27 18:00:00 
 author:     "guanjunjian"
-categories: Docker源码阅读
+categories: DOCKER源码分析
 tags:
     - docker_run
     - network

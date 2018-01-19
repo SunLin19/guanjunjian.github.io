@@ -3,7 +3,7 @@ layout:     post
 title:      "「四」DOCKER源码分析4 daemon端对container create的处理 "
 date:       2017-9-28 17:00:00 
 author:     "guanjunjian"
-categories: Docker源码阅读
+categories: DOCKER源码分析
 tags:
     - docker_run
     - network
