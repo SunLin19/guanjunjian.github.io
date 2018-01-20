@@ -1946,11 +1946,12 @@ if defined(symbol)
     -   它使得很难判断源文件之间的真正依赖关系
     -   一个头文件可能会被多次包含
 -   解决多重包含，可以使用条件编译
-    -   例如：
+    -   例如，以下为某个头文件：
     ```c
     #ifndef _HEADERNAME_H
     #define _HEADERNAME_H 1   // <-----这里也可以直接 #define _HEADERNAME_H
-    //  头文件
+    #include <stdio.h>
+	//  头文件具体内容
     #endif
     ```
     
