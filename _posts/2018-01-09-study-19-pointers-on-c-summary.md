@@ -1847,6 +1847,7 @@ ans = pf( 25 );
 ```
 
     -   方法2：`#argument`这种结构被预处理器翻译为`argument`
+
 ```c
      #define PRINT(FORMAT,VALUE) printf( "The value of " #VALUE "is" FORMART "\n", VALUE)
     int x = 22;
