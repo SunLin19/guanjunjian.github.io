@@ -737,9 +737,532 @@ decltype(i) e; //正确，e是一个int
 -   复合类型包括指针、引用等，复合类型的定义以其他类型为基础
 -   C++语言运行用于以类的形式自定义类型
 
+---
+
+# 第3章 字符串、向量和数组
+
+## 3.1 命名空间的using声明
+
+-   作用域符（::）的含义是：编译器应从操作符左侧名字所示的作用域中去寻找右侧的那个名字
+-   有了using声明就无须专门的前缀，也能使用所需的名字了`using namespace::name;`。注意，需要用分号结束
+-   位于头文件的代码一般来说不应该使用using声明
+
+---
+
+## 3.2 标准库类型string
+
+### 3.2.1 定义和初始化string对象
+
+-   一个类可以定义很多种初始化对象的方法，只不过这些方法方式之间所有区别
+-   以下为string初始化的方式
+
+![][4]
+
+#### 直接初始化和拷贝初始化
+
+-   使用等号=初始化一个变量，是拷贝初始化
+-   不使用等号，则执行的是直接初始化
+-   当初始值只有1个时，使用直接初始化和拷贝初始化都行
+-   当有多个值时，只能使用直接初始化
+
+```c
+//初始值有两个，所以只能使用直接初始化
+string s7(10, `c`);
+```
+
+### 3.2.2 string对象上的操作
+
+![][5]
+
+#### 使用getline读取一整行
+
+-   getline从给定的输入流中读入内存，直到遇到换行符为止（注意换行符也读进来了），存入到string对象中去（注意不存换行符），并最终返回它的流参数，即getline的结果也可以用作条件判断
+-   触发getline函数返回的那个换行符实际上被丢弃了
+
+#### string的empty和size操作
+
+-   empty函数，若字符串为""即为空
+-   size返回string对象的长度，即string对象中字符的个数，但不包括\`\\0\`
+
+#### string::size_type类型
+
+-   size返回的是一个string::size_type类型的值
+-   标准库定义了几种配套的类型，这些配套类型体现了标准库类型与机器无关的特性，类型size_type是其中一种
+-   string::size_type是无符号类型的值，而且能足够存放下任何string对象的大小
+-   表达式中混用带符号数和无符号数可能产生意想不到的结果，例如n是一个带有负值的int，则表达式`s.size() < n`几乎肯定是true，因为负值n为自动转换成一个较大的无符号值
+
+#### 两个string对象相加
+
+-   `+`和`+=`
+-   其内容是把左侧的运算对象与右侧的运算对象串接而成
+
+#### 字面值和string对象相加
+
+-   当把string对象和字符字面值及字符串字面值混在一条语句中使用时，必须确保每个加法运算符两侧的对象至少有一个是string
+
+```c
+string s4 = s1 + ",";  //正确
+string s5 = "hello" + ",";  //错误，运算符两边都不是string
+/*
+正确
+相当于
+string s6 = ( s1 + "," ) + "world"; 
+*/
+string s6 = s1 + "," + "world";
+/*
+正确
+相当于
+string s7 = ( "hello" + "," ) + s2;
+*/
+string s7 = "hello" + "," + s2;
+```
+
+-   为了与C兼容，C++语言中的字符串字面值并不是标准库类型string的对象，字符串字面值与string是不同的类型
+
+### 3.2.3 处理string对象的字符
+
+-   在cctype头文件中定义
+
+![][6]
+
+-   C++标准库中除了定义C++语言特有的功能外，也兼容了C语言的标准库
+-   C语言的头文件形如name.h，C++将这些头文件命名为cname
+-   cctype和ctype.h是一样的
+-   在C++程序中应该使用cname，标准库中的每个名字总能在命名空间std中找到
+
+#### 处理每个字符？使用基于范围的for语句
+
+```c
+//范围for语句
+for( declaration : expression )
+    statement
+```
+
+#### 使用范围for语句改变字符串中的字符
+
+-   如果想要改变string对象中的字符，必须把循环变量定义成引用类型
+
+```c
+string s("Hello world!!!");
+for ( auto &c :s )
+{
+    c = toupper(c);
+}
+```
+
+#### 只处理一部分字符？
+
+-   想要访问string对象中的单个字符有两种方法：下标和迭代器
+-   下标运算符接收的参数是string::size_type，返回值是该位置上的引用，下标从0开始
+-   只要字符串不是常量，就能为下标运算符返回的字符赋予新值
+
+---
+
+## 标准库类型vector
+
+-   vector所有对象的类型都相同
+-   vector也常被称为容器 
+-   C++语言既有类模板，也有函数模板，vector是类模板
+-   编译器根据模板创建类或函数的过程称为实例化
+-   通过一些额外信息来指定模板到底实例化成什么样的类，即在模板名字后面跟一对尖括号，在括号内放在信息上
+
+```c
+vector<int> ivec;
+vector<vector<string>> file;  //该向量的元素是vector对象
+```
+
+-   引用不是对象，所以不存在包含引用的vector
+-   在早期版本的C++标准中，右尖括号和其他元素之间添加一个空格，`vector<vector<int> >`
+
+### 3.3.1 定义和初始化vector对象
+
+![][7]
+
+-   在`vector<T> v4(n)`中，v4包含了n个重复地执行了值初始化的对象，如int则都为0
+
+#### 列表初始化vector对象
+
+-   C++提供了几种初始化方式：`=0`、`={}`、`{}`、`()`，大多数情况可以等价使用
+-   三种例外：
+    -   使用拷贝初始化（`=`）时，只能提供一个初始值
+    -   提供的是类内初始值则只能使用拷贝初始化或使用花括号的形式，即不能使用`()`
+    -   如果提供的是初始元素的列表，则只能把初始值都放在花括号里进行初始化
+    
+```c
+vector<string> v1 {"a","an","the"}; //列表初始化
+vector<string> v1 ("a","an","the");  //错误
+```
+
+#### 列表初始值还是元素数量？
+
+-   vector初始化时，整数的含义可能是vector对象的容量也可能是元素的值，使用花括号或元括号来区别
+
+```c
+vector<int> v1(10); //10个元素，每个都是0
+vector<int> v2{10}; //1个元素，为10
+
+vector<int> v3(10, 1); //10个元素，每个都是1
+vector<int> v1{10, 1}; //2个元素，10和1
+```
+
+-   圆括号提供的值是用来构造vector对象的
+-   花括号提供的值是列表初始化该vector对象
+
+-   如果初始化时使用了花括号的形式，但提供的值又不能用来列表初始化
+
+```c
+vector<string> v5{"hi"}; //初始化列表，有1个元素
+vector<string> v6("hi"); //错，不能使用字符串字面值构建vector对象
+vector<string> v7{10}; //V7有10个默认值的初始化元素，确认无法执行列表初始化后，编译器会尝试用默认值初始化vector对象
+vector<string> v8{10,"hi"}; //v8有10个值为"hi"的元素
+```
+
+### 3.3.2 向vector对象中添加元素
+
+-   vector成员函数`push_back`向其中添加元素，push_back负责把一个值当成vector对象的尾元素
+-   如果循环体内部包含有向vector对象添加元素的语句，则不能使用范围for，范围for语句体内不应该改变其所遍历序列的大小
+
+### 3.3.3 其他vector操作
+
+![][8]
+
+-   size返回vector对象中元素的个数，返回值的类型是由vector定义的size_type类型
+
+```c
+vector<int>::size_type //正确
+vector:size_type //错误
+```
+
+#### 不能用下标形式添加元素
+
+-   vector对象（以及string对象）的下标运算符可用于访问已存在的元素，而不能用于添加元素
+-   确保下标合法的一种有效手段是尽可能使用范围for语句
+
+---
+
+## 3.4 迭代器介绍
+
+-   所有标准库容器都可以使用迭代器，但只有其中少数几种才同时支持下标运算符
+-   string不属于容器类型，但string支持很多与容器类型类似的操作
+-   vector支持下标运算符，这点和string一样；string支持迭代器，这也和vector一样
+-   迭代提供了对对象的间接访问
+
+### 3.4.1 使用迭代器
+
+-   begin和end的成员
+-   begin返回指向第1个元素（或第1个字符）的迭代器
+-   end返回指向容器（或string对象）“尾元素的下一个位置”的迭代器，该迭代器指示的是容器的一个根本不存在的“尾后”元素，仅仅是个标记而已，表示我们已经处理完了容器中的所有元素，被称为尾后迭代器，或尾迭代器
+-   如果begin和end返回的是同一个迭代器，都是尾后迭代器
+
+#### 迭代器运算符
+
+![][9]
+
+-   如果两个迭代器指向的元素相同或都是同一个容器的尾部迭代器，则它们相等
+-   试图解引用一个非法迭代器或者尾后迭代器都是未被定义的行为
+-   因为end返回的迭代器并不实际指向某个元素，所以不能对其进行递增或解引用操作
+-   泛型编程：
+    -   C++程序员习惯地使用`!=`，因为这种编程风格在标准库提供的所有容器上都有效
+    -   标准库容器的迭代器都定义了`==`和`!=`，但它们中的大多数没有定义`<`
+
+#### 迭代器类型
+
+-   拥有迭代器的标准库使用`iterator`和`const_iterator`来表示迭代器的类型
+-   如果vector对象或string对象是一个常量，只能使用const_iterator
+-   如果vector对象或string对象不是一个常量，那两个类型都可以使用
+
+```c
+vector<int>::iterator it;  //能读写vector<int>的元素
+string::iterator it2;  //能读写string对象中的字符
+
+vector<int>::const_iterator it3; //只能读vector<int>的元素
+string::const_iterator it4;  //只能读string对象中的字符
+```
+
+#### begin和end运算符
+
+-   begin和end返回的具体类型由对象是否是常量决定，常量返回const_iterator，非常量返回iterator
+-   C++11引入两个新函数，cbengin和cend，不论vector对象是否是常量，都返回const_iterator
+
+#### 结合解引用和成员访问操作符
+
+```c
+(*it).empty()  //解引用it,然后调用结果对象的empty操作
+*it.empty() //错误，试图访问it的empty成员，但it是个迭代器
+```
+
+-   箭头运算符`->`把解引用和成员访问两个操作结合起来，就是说`it->mem`等于`(*it).mem`
+
+#### 某些对vector对象的操作会使迭代器失效
+
+-   任何一种可能改变vector对象容量的操作，比如pull_back都会使得vector的迭代器失效
+-   但凡使用了迭代器的循环体，都不要向迭代器所属的容器添加元素
+
+### 3.4.2 迭代器运算
+
+![][9]
+
+-   两个迭代器相减，得到距离，所谓距离指的是右侧的迭代器向后移动多少位置就能追上左侧的迭代器，其类型名为difference_type的带符号整型
+
+---
+
+## 3.5 数组
+
+-   与vector相似的地方是，数组也是存放类型相同的对象的容器，这些对象本身没有名字，需要通过其所在位置访问
+-   与vector不同的是，数组大小确定不变，不能随意向数组添加元素
+
+### 3.5.1 定义和初始化内置数组
+
+-   数组是一种复合类型
+-   维度必须是一个常量表达式
+-   数组的元素被默认初始化，即：
+    -   在函数体外，初始化
+    -   在函数体内，不初始化
+-   定义数组的时候必须指定数组的类型，不允许使用auto由初始化列表判断类型
+-   数组的元素应为对象，因此不存在引用的数组
+
+#### 字符数组的特殊性
+
+-   字符数组有一种额外的初始化形式，我们可以用字符串字面值对此数组初始化，一定要注意字符串字面值的结尾处还有一个空字符，这个空字符也会像字符串的其他字符一样拷贝到字符数组中去
+
+```c
+const char a4[6] = "Daniel"; //错误，没有足够空间存放空字符
+```
+
+#### 不允许拷贝和赋值
+
+```c
+int a[] = { 1, 2, 3 };
+int a2[] = a; //错误，不允许使用一个数组初始化另一个数组
+a2 = a; //错误，不允许把一个数组直接赋值给另一个数组
+```
+
+
+```c
+//b表示v的第1个元素，e表示v尾元素的下一个位置
+//b和e的类型相同
+auto b = v.begin(), e = v.end();
+```
+
+#### 理解复杂的数组声明
+
+```c
+int *ptrs[10];  //ptrs是含有10个整型指针的数组
+int &refs[10] = /* ?*/; //错误，不存在引用的数组
+int (*Parray)[10] = &arra; //Parray指向一个含有10个整数的数组
+int (&arrRef)[10] = arra;  //arraRef引用一个含有10个整数的数组
+
+int *(&array)[10] = ptrs; //array是数组的引用，该数组含有10个整型指针
+```
+
+-   默认情况下，类型修饰符从右向左依次绑定，就数组而言，由内向外更好理解
+-   要想理解数组声明的含义，最好的方法是从数组的名字开始按照由内向外的顺序阅读
+
+### 3.5.2 访问数组元素
+
+-   数组下标为size_t类型，是一种机器相关的无符号类型，在cstddef头文件中定义（是C标准库stddef.h的C++版本）
+
+### 3.5.3 指针和数组
+
+-   使用数组的时候编译器一般会把它转换成指针
+-   在很多用到数组名字的地方，编译器都会自动将其替代为一个指向数组首元素的指针
+-   `string *p2 = nums;`等价于`p2 = &nums[0];`
+-   使用数组作为auto参数的初始值时，推断得出的类型是指针而不是数组
+
+```c
+int ia[] = { 0, 1, 2 };
+auto ia2(ia);  //ia2是一个整型数组，指向ia的第1个元素，相当于auto ia2(&a[0]);
+
+decltype(ia) ia3 = { 4, 5, 6 }; //decltype的返回类型是由3个整数构成的数组
+```
+
+#### 指针也是迭代器
+
+-   允许使用递增运算符将指向数组元素的指针向前移动到下一个位置
+-   通过数组名就可以获得指向首个元素的指针
+-   获取尾后指针就要用到数组的另一个特殊性质，假设arra有10个元素，`int *e = &arra[10];`的e即是尾元素的下1个位置的指针
+
+#### 标准库函数begin和end
+
+-   C++引入了两个名为begin和end的函数（定义在iterator头文件中），这两个函数与容器中的两个同名函数功能类似，不过数组毕竟不是类类型，因此这两个函数不是成员函数，使用方法如下：
+
+```c
+int ia[] = { 0, 1, 2 };
+int *beg = begin(ia); //作为参数传入
+int *last = end(ia); 
+```
+
+#### 指针运算
+
+-   两个指针相减的结果的类型是ptrdiff_t的标准库类型，在cstddef头文件中，带符号
+
+#### 下标和指针
+
+```c
+int *p = &ia[2];
+int k = p[-2]; //正确，k即是ia[0]
+```
+
+-   虽然标准库类型string和vector也能执行下标运算，但数组与它们相比还是有所不同
+-   标准库类型限定使用的下标必须是无符号类型，而内置的下标运算符无此要求
+
+### 3.5.4 C风格字符串
+
+#### C标准库String函数
+
+![][10]
+
+-   传入此类函数的指针必须指向以空字符作为结束的数组：
+
+```c
+char ca[] = { 'c', '+', '+' };
+cout << strlen(ca) << endl; //错误，ca没有空字符串结束，该函数可能沿着ca在内存中不断向前寻找，直到遇到空字符才停下来
+```
+
+#### 比较字符串
+
+```c
+//C++风格
+string s1 = "ABC";
+string s2 = "DEF";
+if ( s1 < s2)  
+
+//C风格
+const char ca1[] = "ABC";
+const char ca2[] = "DEF";
+if (ca1 < ca2)  //未定义，试图比较两个无关地址，即比较的是两个const char*的值，争取的应该调用strcmp函数
+```
+
+#### 目标字符串的大小由调用者指定
+
+```c
+//C++风格
+string largeStr = s1 + " " + s2;
+
+//C风格
+//ca1+ca2试图将两个指针相加，非法的，应该使用strcat或strcpy函数
+```
+
+### 3.5.5 与旧代码的接口
+
+-   现在C++程序不得不与那些充满了数组和/或C风格字符串的代码衔接，为了使一些工作简单易行，C++专门提供了一组功能
+
+#### 混用string对象和C风格字符串
+
+-   任何出现字符串字面值的地方都可以以空字符结束的字符数组来替代
+    -   允许以空字符结束的字符数组来初始化string对象或为string对象赋值
+    -   在string对象的加法运算中允许以空字符结束的字符数组作为其中一个运算符（不能两个都是）
+    -   在string对象的复合赋值运算中允许使用以空字符结束的字符数组作为右侧运算对象
+-   反过来不成立，某处需要一个C风格字符串，不能用string替代
+    -   不能用string对象直接初始化指向字符的指针
+    -   但提供了c_str成员函数
+
+```c
+char *str = s; //错误
+const char *str = s.c_str(); //正确，返回的是一个C风格的字符串
+```
+
+-   无法保证c_str返回的数组一直有效，如果后续的操作改变了s的值可能就让之前的数组失去效用
+
+#### 使用数组初始化vector对象
+
+-   不允许使用vector初始化数组，但允许数组初始化vector
+-   只需要指名拷贝区域的首元素地址和尾后地址就可以了
+
+```c
+int int_arr[] = { 0, 1, 2, 3, 4, 5};
+vector<int> ivec(begin(int_arr),end(int_arr));
+vector<int> subVec(int_arr+1,int_arr+4); //拷贝3个元素int_arr[1]、int_arr[2]、int_arr[3]
+```
+
+-   现代的C++程序应该尽量使用vector和迭代器，避免使用内置数组和指针；尽量使用string，避免使用C风格的字符串
+
+---
+
+## 3.6 多维数组
+
+-   严格来说，C++没有多维数组，多维数组只是数组的数组
+
+#### 多维数组的下标引用
+
+-   如果表达式含有的下标运算符数量和数组的维度一样多，该表达式的结果将是给定类型的元素
+-   如果下标运算符数量少于维度数量，则表达式的结果将是给定索引所处的一个内存数组
+
+```c
+//ia位2维，arr为3维
+ia[2][3] = arra[0][0][0]; //返回arr的首元素
+int (&row)[4] = ia[1]; //把row绑定到ia的第二个4元素数组上
+```
+
+#### 使用范围for语句处理多维数组
+
+```c
+//ia[3][4]
+size_t cnt = 0;
+for ( auto &row : ia )  //对于外层数组的每一个元素，row是含有4个整数的数组的引用
+    for(auto &col :row)  //对于内存数组的每一个元素，col是整数的引用
+    {
+        col = cnt;
+        ++cnt;
+    }  
+    
+
+//这个循环没有任何写操作，但外层循环的控制变量还是引用类型，是为了避免数组被自动转成指针    
+size_t cnt = 0;
+for ( auto &row : ia )  //对于外层数组的每一个元素，row是含有4个整数的数组的引用
+    for(auto col :row)  //对于内存数组的每一个元素，col是整数
+    {
+        cout << col << endl;
+    }  
+    
+
+size_t cnt = 0;
+//因为row不是引用类型，所以编译器初始化row时会自动将数组形式的元素转换指向数组首元素的指针，那么row的类型就是int*，这样内存的循环就不合法了，编译器试图在int*内遍历
+for ( auto row : ia )   
+    for(auto col :row)  
+  
+```
+
+-   要使用范围for语句处理多维数组，除了最内层的循环，其他所有循环的控制变量都应该是引用类型
+
+#### 指针和多维数组
+
+```c
+int ia[3][4]
+int (*p)[4] = ia;  //p指向含有4个整数的数组，即ia[0]
+p = &ia[2]; //p指向ia的尾元素
+
+
+//上面声明中圆括号不可少
+int *ip[4]; //整型指针的数组
+int (*ip)[4]; //指向含有4个整数的数组指针
+```
+
+```c
+//p指向含有4个整数的数组，区别于范围for
+for ( auto p = ia; p != ia + 3; ++p )
+    //q指向4个整数数组的首个元素，也就是说，q指向一个整数
+    for( auto q = *p; q != *p + 4; ++q )
+        cout << *q << ` `;
+    cout << endl;
+```
+
+---
+
+## 小结
+
+-   数组和指向数组元素的指针在一个较低的层次上实现了与标准库类型string和vector类似的功能
+-   一般来说，应该优先使用标准库提供的类型，之后再考虑C++语言内置的低层的替代品数组和指针
 
 ---
 
 [1]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_2_1.png "表2.1 C++算术类型"
 [2]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_2_2.png "表2.2 指定字面值的类型"
 [3]:https://www.zhihu.com/question/49877624/answer/118259022 "C++ Primer5th第二章上一句话有疑问?"
+[4]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_1.png "表3.1 初始化string对象的方式"
+[5]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_2.png "表3.2 string的操作"
+[6]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_3.png "表3.3 cctype头文件中的函数"
+[7]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_4.png "表3.4 初始化vector对象的方法"
+[8]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_6.png "表3.6 标准容器迭代的运算符"
+[9]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_7.png "表3.7 vector和string迭代器支持的运算"
+[10]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_8.png "表3.8 C风格字符串的函数"
