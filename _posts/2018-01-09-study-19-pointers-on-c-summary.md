@@ -171,11 +171,12 @@ tags:
 -   声明枚举类型:`enum Jar_Type { CUP, PINT, QUART }`
 -   声明枚举类型的变量：`enum Jar_Type mikl_jug;`
 -   匿名枚举类型声明
-    - 例子：
-    ```
+
+```c
     enum { CUP, PINT, QUART }
         mikl_jug;
-    ```
+```
+
 -   枚举类型实际上是整型方式存储，CUP是0，PINK是1
 -   同时也可以给符号名赋值，如果某个符号名赋值了，但下一个没赋值，那么这个没赋值的符号名就比上一个赋值了的符号名的值大1
 
@@ -263,18 +264,18 @@ tags:
 ## 3.3 typedef
 
 -   typedef机制允许你为各种数据类型定义新名字
-    -   例子：
-    ```c
+
+```c
     typedef char *ptr_to_char;   //ptr_to_char作为指向字符的指针类型的新名字
     ptr_to_char a;   //a是一个指向字符的指针
-    ```
+```
 
 -   `#define`不法正确处理指针类型
-    -   例子：
-    ```c
+
+```c
     # define d_ptr_to_char  char *
     d_ptr_to_char a,b;  //这里只有a是字符指针，而b只是字符
-    ```
+```
 
 -   复杂的类型名，如函数指针和指向数组的指针，使用typedef更合适
 
@@ -287,13 +288,14 @@ tags:
     -   声明时对它进行初始化，`int const a = 15;`
     -   形参在函数调用时会得到实参的值
 -   关于指针（const往前结合）
-    -   例子：
-    ```c
+
+```c
     int *pi;  //普通的指向整型的指针
     int const *pci;  //指向整型常量的指针
     int * const cpi;  //指向整型的常量指针
     int const * const cpci;  //指向整型常量的常量指针
-    ```
+```
+
 -   `#define`也可以创建名字常量`#define MAX 50`和`int const max = 50`一样
 
 ---
@@ -349,14 +351,14 @@ tags:
 -   static只对缺省属性为external的声明才会有改变链接属性的效果
 -   extern为一个标识符指定external链接属性
 -   extern用于标识符的第1次声明时，它指定标识符具有external链接属性；用于标识符的第2次或以后的声明时，不会改变第一次声明所指定的链接属性
-    -   例子：
-    ```c
+
+```c
     static int i;  //声明1
     int func()
     {
         extern int i; //不修改由声明1所指定的变量i的链接属性
     }
-    ```
+```
     
 ---
 
@@ -453,12 +455,13 @@ tags:
 -   1.赋值是表达式的一种，而不是某种类型的语句（没有赋值语句）
 -   2.赋值是表达式，所以它就具有一个值，赋值表达式的值就是左操作数的新值，可以作为其他赋值操作符的右操作数，如`a = x = y + 3`,即`a = ( x = y + 3 )`
 -   3.`a = x = y + 3`认为a和x被赋予相同的值的说法是错误的，因为可能变量类型不同，比如x是字符型变量，那么y+3的值就会被截去一段，所以以下代码是错误的（具体参照P70）
-    - a.   
-        ```
-        char ch;
-        ...
-        while( ( ch = getchar() ) != EOF )...
-        ```
+   
+```c
+   char ch;
+   ...
+   while( ( ch = getchar() ) != EOF )...
+```        
+
 -   4.复合赋值符：`+=、<<=、&=`等等，`a += expression`等于`a += a + ( expression )`
 
 ### 5.1.5 单目操作符
@@ -511,12 +514,13 @@ tags:
 -   C不具备显示的布尔类型，使用整数代替
 -   零是假，任何非零值为真
 -   注意这类写法，flag为1以外的其他非零值，这个if语句也是不执行的：
-    - a.
-    ```
+
+```c
     #define FALSE 0
     #define TRUE 1
     if( flag == TRUE)
-    ```
+```
+
 ---
 
 ## 5.3 左值和右值
@@ -589,11 +593,11 @@ tags:
 
 ## 6.5 未初始化和非法的指针
 
-    ```
+```c
     int *a;
     ...
     *a =12;
-    ```
+```
     
 -   是错误的，因为没有对a进行初始化
 
@@ -701,11 +705,13 @@ tags:
 -   函数的定义就是函数体的实现
 -   函数声明出现在函数被调用的地方，函数声明向编译器提供函数的相关信息，用于确保函数被正确地调用
 -   存根(stub)：应该就是一个空函数。编写这类存根，或者说为尚未编写的代码“占好位置”，可以保持程序在结构上的完整性，以便于你编译和测试程序的其他部分
-    ```
+    
+```c
     function_name()
     {
     }
-    ```
+```
+
 -   过程类型的函数：没有返回值
 -   真函数：从表达式内部调用的，必须返回一个值，用于表达式的求值
 
@@ -839,32 +845,33 @@ average ( int n_values, ...)
     -   1.`sizeof`：返回整个数组的长度
     -   2.`&`:指向数组的指针，而不是指向某个指针常量的指针，也就是说若array为数组名，那么`array == &array`,但也存在区别，看[数组名a和&a的区别](http://blog.csdn.net/wanwenweifly4/article/details/6424058)
 -   考虑下面例子：
-    -   a.   
-    ```c
+
+```c
     int a[10];
     int b[10];
     int *c;
     ...
     c = &a[0];  //和 c = a 是一样的；b = a 是非法的； a = c是非法的，a是常量不能修改
-    ```
+```
 
 ### 8.1.2 下标引用
 
--   除了优先级外，下标引用和间接访问完全相同
-    -   如下是相同的：
-    ```c
+-   除了优先级外，下标引用和间接访问完全相同,如下是相同的：
+
+```c
     array[ subscript ]
     * ( array + ( subscript ) )
-    ```
-    -   例子：
-    ```c
+```
+
+```c
     int array[10];
     int *ap = array + 2;
     
     ap[0]; //对等*(ap+(0))，即array[2]
     *ap+6; //array[2]+6
     ap[-1]; //array[1]
-    ```
+```
+
 -   C的下标检查所涉及的开销比你刚开始想象的要多
 -   `2[array]`是合法的，等于`( 2 + ( array ) )`，就是`*( array + 2 )`,也就是`array[2]`
 
@@ -929,11 +936,11 @@ average ( int n_values, ...)
 
 -   ```char m[] = { `H`, `I` };```
 -   `char m[] = "HI";`,尽管这个看上去是一个字符串常量，实际上不是
-    -   例子：
-    ```c
+
+```c
     char m1[] = "HELLO"; //初始化一个字符数组的元素
     char *m2 = "HELLO"; //真正的字符串常量
-    ```
+```
 
 ---
 
@@ -957,18 +964,17 @@ average ( int n_values, ...)
 
 ### 8.2.4 指向数组的指针
 
--   例子：
-    ```c
+
+```c
     int v[10], *vp = v;  //合法
     int m[3][10], *mp = m; //非法，mp是指向整型的指针，而m是一个指向整型数组的指针
     int (*p1)[10] = m;  //合法
     int (*p2)[] = m;  //应该避免这种类型的声明，不能执行指针运算
-    ```
+```
     
 ### 8.2.5 作为函数参数的多维数组
 
--   例子：
-    ```c
+```c
     int matrix[3][10];
     ...
     func2( matrix );
@@ -978,20 +984,21 @@ average ( int n_values, ...)
     void func2( int mat[][10] );
     //但以下方式是错误的
     void func2( int **mat ); //指向整型指针的指针和指向整型数组的指针并不是一回事
-    ```
+```
 
 ### 8.2.6 初始化
 
 -   初始化多维数组时，数组的存储顺序非常重要
 -   初始化例子：`int m[2][3] = { 1, 2, 3, 4, 5, 6};`
 -   初始化也可以是：
-    -   例子：
-    ```c
+
+```c
     int m[2][5] = {
         { 1, 2, 3, 4, 5},
         { 6, 7, 8, 9, 10}
     };
-    ```
+```
+
 -   如果使用了这些花括号，每个子初始化列表都可以省略尾部的几个初始值，每一维的初始列表都各自都是一个初始化列表
 
 ### 8.2.7 数组长度自动计算
@@ -1007,7 +1014,8 @@ average ( int n_values, ...)
 -   声明指针数组`int *api[10]`，api是数组名，数组元素是整型指针；区别与二维数组`int (*api)[10]`，api是指针名，指向的是一个长度为10的整型数组
 -   区别：
     -   字符串以矩阵存储还是以指针常量方式存储（需要两种方式占用内存空间方面的区别，图在P164）
-    ```c
+
+```c
     //指针常量
     char const *keyword1[] = {
         "do",
@@ -1018,7 +1026,8 @@ average ( int n_values, ...)
         "do",
         "for"
     }
-    ```
+```
+
 -   哪种更好？
     -   字符串长度差不多：矩阵，因为无需使用指针
     -   字符串长度千差万别：指针数组
@@ -1103,11 +1112,13 @@ average ( int n_values, ...)
 
 -   这些函数接受一个现实的长度参数
 -   如果源参数和目标参数发生重叠，strcpy和strncat的结果就是未定义的
+
 ```c
 char *strncpy( char *dst, char const *src, size_t len );
 char *strncat( char *dst, char const *src, size_t len );
 int *strncmp( char const *s1, char const *s2, size_t len );
 ```
+
 -   如果strlen(src)的值小于len，dst数组就用额外的NUL字节填充到len长度
 -   如果strlen(src)的值大于或等于len，那么只有len个字符被复制到dst中，注意！它的结果不会以NUL字节结尾
 -   在使用不受限的函数之前，你首先必须确定字符串实际上是以NUL字节结尾的，但长度受限函数不需要
@@ -1159,7 +1170,8 @@ char *strstr( char const *s1, char const *s2 );
 
 -   strspn和strcspan用于在字符串的起始位置对字符计数
 -   strspn()从参数str字符串的开头计算连续的字符，而这些字符都完全是group 所指字符串中的字符。简单的说，若strspn()返回的数值为n，则代表字符串s开头连续有n 个字符都是属于字符串group内的字符
-```
+
+```c
 //返回str起始部分匹配cgroup中任意字符的字符数
 size_t strspn( char const *str, char const *group );
 //对str字符串起始部分中不与group中任何字符匹配的字符数
@@ -1177,6 +1189,7 @@ ptr = buffer + strspn( buffer, "\n\r\f\t\v");
 ### 9.6.2 查找标记
 
 -   strtok:从字符串中隔离各个单独的称为标记（token）的部分，并丢弃分隔符
+
 ```c
 char *strtok( char *str, char const *sep)
 
@@ -1191,6 +1204,7 @@ void print_tokens( char *line )
 	}
 }
 ```
+
 -   sep参数是个字符串，定义了用作分隔的字符集合
 -   strtok找到str的下一个标记，并将其用NUL结尾，然后返回一个指向这个标记的指针
 -   它将会修改它所处理的字符串
@@ -1229,7 +1243,7 @@ void print_tokens( char *line )
 
 -   转换函数把大写字母转换为小写字母，或反过来
 
-```
+```c
 int tolower( int ch );
 int toupper( int ch );
 ```
@@ -1300,15 +1314,15 @@ void *memset( void *a, int ch, size_t length );
 -   `struct tag { member-list } variable-list;`
 -   两个成员列表完全相同的结构体，也是不同的类型
 -   声明结构体时可以用typedef创建一种新的类型
-    -   例子：
-    ```c
+  
+```c
     typedef struct {
         int a;
         char b;
     } Simple;
     
     Simple x;
-    ```
+```
 
 ### 10.1.2 结构成员
 
@@ -1439,6 +1453,7 @@ Ex *px = &x;
 ## 10.3 结构的存储分配
 
 -   编译器安装成员列表的顺序一个接一个地给每个成员分配内存。只有当存储成员时需要满足正确的便捷对齐要求时，成员之间才可能出现填充的额外内存空间
+
 ```c
 struct ALIGN {
     char a;
@@ -1446,6 +1461,7 @@ struct ALIGN {
     char c;
 }
 ```
+
 -   如果某个机器的整型值长度为4个字节，并且它的起始存储位置必须能够被4整除，那么这个结构体在内存中的存储将如下所示
 -   `[a][][][][b, , , ][c][][][]`
 -   系统禁止编译器在一个结构体的起始位置跳过几个字节来满足边界对齐要求，因此所有结构的起始存储位置必须是结构中边界要求最严格的数据类型所要求的位置，因此a必须存储于一个能够被4整除的地址
@@ -1476,8 +1492,8 @@ struct ALIGN {
 -   注重可移植性的程序应该避免使用位段
 -   位段中的成员在内存中是从左向右分配还是相反，在不同机器上是不同的
 -   位段声明的例子：
-    -   例子
-    ```c
+
+```c
     struct CHAR {
         unsigned ch     : 7;
         unsigned font   : 6;
@@ -1485,7 +1501,8 @@ struct ALIGN {
     };
     
     struct CHAR ch1;
-    ```
+```
+
 -   使用位段的理由：
     -   它能够把长度为奇数的数据包装在一起，节省存储空间
     -   可以很方便地访问一个整型值的部分内容
@@ -1495,13 +1512,14 @@ struct ALIGN {
 ## 10.6 联合
 
 -   联合的所有成员引用的是内存中相同位置
-    -   例子：
-    ```c
+
+```c
     union {
         float f;
         int i;
     }
-    ```
+```
+
 -   如果f被使用，这个数就作为浮点值访问，如果i被使用，就作为整型值访问
 -   如果联合的各个成员具有不同的长度，联合的长度就是它最长成员的长度
 
@@ -1514,14 +1532,15 @@ struct ALIGN {
 ### 10.6.2 联合的初始化
 
 -   联合变量可以被初始化，但这个初始化必须是联合第1个成员的类型，而且必须在一对花括号里
-    -   例子：
-    ```c
+
+```c
     union {
         int a;
         float b;
         char c[4];
     } x = { 5 };
-    ```
+```
+
 -   如果给出的初始值时任何其他类型，它就会转换（如果可能的话）成一个整数并复制给x.a
 
 ---
@@ -1587,6 +1606,7 @@ struct ALIGN {
 void *calloc( size_t num_element, size_t element_size);
 void realloc( void *ptr, size_t new_size);
 ```
+
 -   malloc和calloc区别：
     -   后者在返回指向内存的指针之前把它初始化为0   
     -   它们请求内存数量的方式不一样，calloc的参数包括所需元素的数量和每个元素的字节数
@@ -1817,21 +1837,23 @@ ans = pf( 25 );
 -   宏参数和`#define`定义可以包含其他`#define`定义的符号，但宏不可以出现递归
 -   预处理器搜索`#define`定义的符号时，字符串常量的内容并不进行检查，如果想把宏参数插入到字符串常量中，可以
     -   方法1：利用邻近字符串自动连接的特性，把一个字符串分为几段，每一段实际上都是一个宏参数
-    ```c
+
+```c
     #define PRINT(FORMAT,VALUE) printf( "The value is " FORMART "\n", VALUE)
     int x = 22;
     PRINT("%d", x+3 );
     
     //输出为：The value is 25
-    ```
+```
+
     -   方法2：`#argument`这种结构被预处理器翻译为`argument`
-    ```c
+```c
      #define PRINT(FORMAT,VALUE) printf( "The value of " #VALUE "is" FORMART "\n", VALUE)
     int x = 22;
     PRINT("%d", x+3 );
     
     //输出为：The vaule of x+3 is 25
-    ```
+```
 
 <br/>
 
@@ -1953,13 +1975,14 @@ if defined(symbol)
     -   一个头文件可能会被多次包含
 -   解决多重包含，可以使用条件编译
     -   例如，以下为某个头文件：
-    ```c
+
+```c
     #ifndef _HEADERNAME_H
     #define _HEADERNAME_H 1   // <-----这里也可以直接 #define _HEADERNAME_H
     #include <stdio.h>
 	//  头文件具体内容
     #endif
-    ```
+```
     
 ---
 
@@ -1973,11 +1996,12 @@ if defined(symbol)
 -   `#progma`是不可移植的
 -   无效指令就是一个`#`符号开头，但后面不跟任何内容的一行
     -   例如：
-    ```c
+
+```c
     #
     #include <stdio.h>
     #
-    ```
+```
 
 ---
 
@@ -2225,6 +2249,7 @@ int sscanf( char const *string, char const *format, ...);
     -   一个可选限定符，用于修改有些格式代码的含义，为了指定参数的长度，P309 表15.3 scanf限定符
     -   格式代码，就是一个单字符，用于指定输入字符如何被解释，P310 表15.4 scanf格式码
 -   例子：
+
 ```c
 nfields = fscanf( input, "%d4 %d4 %d4", &a, &b, &c);
 //若输入为12345 67890
