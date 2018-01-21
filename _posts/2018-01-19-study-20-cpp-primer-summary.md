@@ -1071,7 +1071,7 @@ int *(&array)[10] = ptrs; //array是数组的引用，该数组含有10个整型
 
 ```c
 int ia[] = { 0, 1, 2 };
-auto ia2(ia);  //ia2是一个整型数组，指向ia的第1个元素，相当于auto ia2(&a[0]);
+auto ia2(ia);  //ia2是一个整型指针，指向ia的第1个元素，相当于auto ia2(&a[0]);
 
 decltype(ia) ia3 = { 4, 5, 6 }; //decltype的返回类型是由3个整数构成的数组
 ```
