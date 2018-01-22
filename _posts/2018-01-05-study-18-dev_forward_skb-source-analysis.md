@@ -326,7 +326,7 @@ static inline void skb_orphan(struct sk_buff *skb)
 
 根据[[参考4][4]]，可以知道classid是存储在`skb->sk->sk_cgrp_data->classid`，而这里skb->sk已经被清空，自然在veth转发后，classid就不存在了。
 
-### 3.2 netif_rx_internal(skb)
+### 3.2 netif_rx_internal()
 
 根据[[参考9][9]]，`netif_rx_internal()`就是非NAPI设备对应的中断上半部。
 
