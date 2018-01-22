@@ -1210,7 +1210,7 @@ for ( auto &row : ia )  //对于外层数组的每一个元素，row是含有4�
 //这个循环没有任何写操作，但外层循环的控制变量还是引用类型，是为了避免数组被自动转成指针    
 size_t cnt = 0;
 for ( auto &row : ia )  //对于外层数组的每一个元素，row是含有4个整数的数组的引用
-    for(auto col :row)  //对于内存数组的每一个元素，col是整数
+    for(auto col : row)  //对于内存数组的每一个元素，col是整数
     {
         cout << col << endl;
     }  
@@ -1219,7 +1219,7 @@ for ( auto &row : ia )  //对于外层数组的每一个元素，row是含有4�
 size_t cnt = 0;
 //因为row不是引用类型，所以编译器初始化row时会自动将数组形式的元素转换指向数组首元素的指针，那么row的类型就是int*，这样内存的循环就不合法了，编译器试图在int*内遍历
 for ( auto row : ia )   
-    for(auto col :row)  
+    for(auto col : row)  
   
 ```
 
