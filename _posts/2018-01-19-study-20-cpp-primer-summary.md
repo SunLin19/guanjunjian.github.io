@@ -1666,6 +1666,236 @@ char *pc = (char*)ip;
 
 ---
 
+# 第5章 语句
+
+## 5.1 简单语句
+
+```c
+ival = v1 + v2 ;;  //正确，第二个分号表示一条多余的空语句
+```
+
+---
+
+## 5.3 条件语句
+
+### 5.3.1 if语句
+
+#### 悬垂else
+
+-   怎么知道某个给定的else是和哪个if匹配呢？
+    -   这个问题通常称为悬垂else
+    -   C++规定else与离它最近的尚未匹配的if匹配
+
+### 5.3.2 switch语句
+
+-   `switch(expr)`中expr表达式的值转换成整数类型，然后与每个case标签的值比较
+-   case标准必须是整型常量表达式（可以是const char这些）
+-   任何两个case标签的值不能相同
+
+#### swtich内部的控制流
+
+-   case标签之后不一定非得换行，把几个case标签写在一行里，强调这些case代表的是某个范围内的值：
+
+```c
+switch(ch)
+{
+    case:`a`:case:`b`:case:`c`:
+        ++vowelCnt;
+        break;
+}
+```
+
+#### 漏写break容易引发缺陷
+
+-   尽管switch语句不是非得在最后一个标签后面写上break，但是为了安全起见，最好这么做
+
+#### default标签
+
+-   switch结构以一个空的default标签作为结束，则该标签后面 必须跟一条空语句或一个空块
+
+#### switch内部的变量含义
+
+-   如果在某处一个带有初值的变量位于作用域之外，在另一处该变量位于作用域之内，则从前一处跳转到后一处的行为是非法行为
+-   不允许跨过变量的初始化语句直接跳转到该变量作用域内的另一个地方
+
+```c
+    case: true:
+        //因为程序的执行流可能绕开下面的初始化语句，所以该switch语句不合法
+        string file_name;   //错误，控制流绕过一个隐式初始化的变量
+        int ival = 0;   //错误，控制流绕过一个显示初始化的变量
+        int jval;   //正确，因为jval没有初始化
+        break;
+    case: false:
+        //正确，jval虽然在作用域内，但是它没有被初始化
+        jval = next_num();  
+        if(file_name.empty())   //错误，file_name在作用域内，但是没有被初始化
+            //...
+```
+
+-   如果需要为某个case分支定义并初始化一个变量，我们应该把变量定义在块内，从而确保后面的所有case标签都在变量的作用域之外
+
+```c
+    case true:
+        {
+            //正确，声明语句位于语句块内部
+            string fine_name = get_file_name;
+            //...
+        }
+        break;
+    case false:
+        if(file_name.empty()) //错误，file_name不在作用域之内
+```
+
+### 5.4.2 传统的for语句
+
+```c
+for (init-statement;condition;expression)
+    statement;
+```
+
+#### for语句中的多重定义
+
+-   init-statement也可以定义多个对象，但是init-statement只能有一条声明语句，因此所有变量的基础类型必须相同
+
+```c
+    for(decltype(v.size()) i = 0, sz = v.size(); i != sz; i++)
+        v.push_back(v[i]);
+```
+
+#### 省略for语句头的某些部分
+
+-   省略condition的效果等价于在条件部分写了一个true，所以在循环体内必须有语句负责退出循环，否则循环就永无休止地执行下去
+
+### 5.4.3 范围for语句
+
+-   在范围for语句中，预存了end()的值，一旦在序列中添加（删除）元素，end函数的值就可能变得无效了，将在9.3.6有更详细的介绍
+
+### 5.4.4 do while语句
+
+-   因为do while先执行语句或者块，后判断条件，所以不允许在条件部分定义变量
+
+```c
+    do{
+        //...
+        numble(foo);
+    } while(int foo = get_foo());  //错误，将生命放在了do的条件部分
+```
+
+---
+
+##  5.5 跳转语句
+
+-   C++提供了4种跳转语句：break、continue、goto、return
+
+### 5.5.1 break语句
+
+-   break语句负责终止离它最近的while、do while、for（包括范围for）或switch语句，并从这些语句之后的第一条语句开始继续执行
+
+### 5.5.2 continue语句
+
+-   continue语句终止最近的循环中的当前迭代并立即开始下一次迭代
+-   只能出现在for（包括范围for）、while和do while的循环内部，或嵌套在此类循环的语句或块的内部
+
+### 5.5.3 goto语句
+
+-   goto语句的作用是从goto语句无条件跳转到同一函数内的另一条语句
+-   带标签语句`end: return;`可以作为goto的目标
+-   标签标示独立于变量或其他标示符的名字，因此，标签标示符可以和程序中其他实体的标示符使用同一个名字而不会互相干扰
+-   goto语句和控制权转向的那条标签的语句必须位于同一个函数之内
+-   goto语句也不能将程序的控制权从变量的作用域之外转移到作用域之内
+
+```c
+    ..///
+    goto end;
+    int ix = 10; //错误，goto语句绕过（往下）一个带初始化的变量定义
+end:
+    ix = 42; //错误，此处的代码需要使用ix，但是goto语句绕过了它的声明    
+```
+
+-   向后跳过一个已经执行的定义是合法的。跳回到变量定义之前意味着系统将销毁该变量，然后重新创建它：
+
+```c
+    //向后（往上）跳过一个带初始化的变量定义是合法的
+    begin:
+        int sz = get_size();
+        if(sz <= 0) {
+            goto begin;    
+        }
+```
+
+-   goto语句执行后将销毁sz，因为跳回到begin的动作跨过了sz的定义语句，所以sz将被重新定义并初始化
+
+---
+
+## 5.6 try语句块和异常处理
+
+-   当程序的某部分检测到一个它无法处理的问题时，需要用到异常处理
+-   throw表达式，异常检测部分使用throw表达式来表示它遇到了无法处理的问题
+-   try语句块，异常处理部分使用try语句块处理异常，并以一个或多个catch子句结束
+
+### 5.6.1 throw表达式
+
+```
+    //...
+    throw runtime_error("Data must refer to name ISBN")
+    // 如果程序执行到这里，表示没有出现异常
+    cout << item1 + item2 << endl;
+```
+
+-   类型runtime_error是标准库异常类型的一种，定义在stdexcept头文件中
+
+### 5.6.2 try语句块
+
+```c
+    try{
+        program-statement
+    } catch (exception-declaration) {
+        handler-statement
+    } catch (exception-declaration) {
+        handler-statement
+    } //,,,
+```
+
+-   `catch (exception-declaration)`括号内一个（可能未命名的）对象的声明（称为异常声明）
+-   当选中了某个catch自己处理异常之后，执行与之对应的块，catch一旦完成，程序跳转到try语句块最后一个catch子句之后的那条语句继续执行 
+
+#### 编写处理代码
+
+-   每个标准库异常类都定义了名为what的成员函数，这些函数没有参数，返回值是C风格的字符串（即const char *）
+
+#### 函数在寻找处理代码的过程中退出
+
+-   在寻找处理代码的过程与函数调用链刚好相反。
+    -   当异常被抛出后，首先搜索抛出异常的函数
+    -   如果没有找到匹配的catch语句，终止该函数
+    -   并在调用该函数的函数中继续寻找
+    -   如果还是没有找到匹配的catch子句，这个新的函数也被终止
+    -   继续搜索调用它的函数
+    -   以此类推，沿着程序的执行路径逐层回退，直到找到合适类型的catch子句为止
+    -   如果最终还是没有找到任何匹配的catch子句，程序转到名为terminate的标准库函数
+-   如果一段程序没有try语句块且发生了异常，系统会调用terminate函数并终止当前程序的执行
+-   异常发生时应确保对象有效、资源无泄漏、程序处于合理状态
+
+### 5.6.3 标准异常
+
+-   C++标准库定义了一组类，用于报告标准库函数遇到的问题
+    -   exception头文件定义了最通用的异常类exception。它只报告异常的发生，不提供任何额外信息
+    -   stdexcept头文件定义了几种常用的异常类，详情在下面表5.1中列出
+    -   new头文件定义了`bad_alloc`异常类型，将在12.1.2详细介绍
+    -   `type_info`头文件定义了`bad_cast`异常类型，将在19.2详细介绍
+
+![][12]
+
+-   标准库异常类只定义了几种运算，包括创建异常类型对象、拷贝异常类型对象、对异常类型的对象赋值
+-   `exception`、`bad_alloc`、`bad_cast`对象以默认初始化方式初始化，不允许为这些对象提供初始值
+-   除以上三种之外的异常类型，应该使用string或C风格字符串初始化这些类型的对象，但不允许使用默认初始化的方式
+-   异常类型值定义了一个名为what的成员函数，该函数没有任何参数，返回值是一个指向C风格字符串的`const char*`。该字符串的目的是提供关于异常的一些文本信息
+-   what函数返回的C风格字符串的内容与异常对象的类型有关。
+    -   如果异常类型有一个字符串初始值，则what返回该字符串
+    -   对于其他无初始值的异常类型，what返回的内容由编译器决定
+
+---
+
 [1]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_2_1.png "表2.1 C++算术类型"
 [2]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_2_2.png "表2.2 指定字面值的类型"
 [3]:https://www.zhihu.com/question/49877624/answer/118259022 "C++ Primer5th第二章上一句话有疑问?"
@@ -1677,3 +1907,4 @@ char *pc = (char*)ip;
 [9]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_7.png "表3.7 vector和string迭代器支持的运算"
 [10]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_3_8.png "表3.8 C风格字符串的函数"
 [11]:https://zhidao.baidu.com/question/134858879565236325.html "求助！！对string对象和vector对象执行sizeof运算结果"
+[12]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_5_1.png "表5.1 <stdexcept>定义的异常类"
