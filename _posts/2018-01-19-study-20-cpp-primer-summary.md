@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "「二十」《C++Primber》要点提炼"
+title:      "「二十」《C++Primber》笔记"
 date:       2018-01-19 15:00:00
 author:     "guanjunjian"
 categories: 阅读
@@ -13,7 +13,7 @@ tags:
 {:toc}
 
 >
-> 《C++Primer》 （第5版）要点提炼，持续更新
+> 《C++Primer》 （第5版）笔记，持续更新
 >
 
 # 第1章 开始

@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "「十九」《C和指针》要点提炼"
+title:      "「十九」《C和指针》笔记"
 date:       2018-01-09 10:00:00
 author:     "guanjunjian"
 categories: 阅读
@@ -13,7 +13,7 @@ tags:
 {:toc}
 
 >
-> 《C和指针》 要点提炼
+> 《C和指针》 笔记
 >
 
 # 第2章 基本概念
