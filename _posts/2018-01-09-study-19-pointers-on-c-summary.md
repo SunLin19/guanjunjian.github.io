@@ -2851,11 +2851,11 @@ void exit( int status );
 -   ANSI C实现了一个assert宏
 -   `void assert( int expression );`
 -   当它被执行时，这个宏对表达式参数进行测试。
--   如果为假（零），就向标准错误打印一条诊断信息并终止程序；如果位真（非零），就不打印任何东西，程序继续执行
+-   如果为假（零），就向标准错误打印一条诊断信息并终止程序；如果为真（非零），就不打印任何东西，程序继续执行
 -   `assert( value != NULL );`，如果value为NULL，则会打印`Assertion failed: value != NULL, file.c line 280`
 -   assert只适合用于验证必须为真的表达式
 -   可以在编译时通过定义NDEBUG消除所有的断言，以下任一操作，预处理器将丢弃所有的断言
-    -   使用-DNDEBUG编译器命令行选项
+    -   使用`-D NDEBUG`编译器命令行选项
     -   在源文件中头文件assert.h被包含之前增加`#define NDEBUG`
 
 ### 16.7.3 环境<stdlib.h>
