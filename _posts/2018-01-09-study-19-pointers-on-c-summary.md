@@ -760,9 +760,65 @@ tags:
 
 -   C通过运行时堆栈支持递归函数的实现，递归函数就是直接或间接调用自身的函数。
 
+```c
+#include <stdio.h>
+void
+binary_to_ascii( unsigned int value)
+{
+	unsigned int quotient;
+	
+	quotient = value / 10;
+	if( quotient != 0 )
+		binary_to_ascii( quotient );
+	putchar( value % 10 + '0' );
+}
+```
+
 ### 7.5.1 追踪递归函数
 
 -   追踪一个递归函数执行过程的关键是理解函数中所声明的变量是如何存储的，因此可以通过画堆栈图来理解（参考P128的例子）
+-   假设调用函数`binary_to_ascii( 4267 );`
+-   当函数开始执行时，堆栈的内容如下图所示：
+
+-	步骤1：
+
+![][9]
+
+-	步骤2：
+
+![][10]
+
+-	步骤3：
+
+![][11]
+
+-	步骤4：
+
+![][12]
+
+-	步骤5：
+
+![][13]
+
+-	步骤6：
+
+![][14]
+
+-	步骤7：
+
+![][15]
+
+-	步骤8：
+
+![][16]
+
+-	步骤9：
+
+![][17]
+
+-	步骤10：
+
+![][18]
 
 ### 7.5.2 递归与迭代
 
@@ -3631,6 +3687,17 @@ _sum_three_values:
 [6]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_1.png "图2.1 编译过程"
 [7]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_2_2.png "图2.2 三字母词"
 [8]:https://arkingc.github.io/2018/01/12/c-stack_frame/ "C函数栈帧 "
+[9]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_1.png "7.5.1 追踪递归函数图1"
+[10]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_2.png "7.5.2 追踪递归函数图2"
+[11]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_3.png "7.5.3 追踪递归函数图3"
+[12]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_4.png "7.5.4 追踪递归函数图4"
+[13]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_5.png "7.5.5 追踪递归函数图5"
+[14]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_6.png "7.5.6 追踪递归函数图6"
+[15]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_7.png "7.5.7 追踪递归函数图7"
+[16]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_8.png "7.5.8 追踪递归函数图8"
+[17]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_9.png "7.5.9 追踪递归函数图9"
+[18]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-19-pointers-on-c-summary/img_7_5_1_10.png "7.5.10 追踪递归函数图10"
+
 
 
 
