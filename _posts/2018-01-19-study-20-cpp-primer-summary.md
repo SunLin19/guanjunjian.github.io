@@ -858,7 +858,7 @@ for ( auto &c :s )
 
 ---
 
-## 标准库类型vector
+## 3.3 标准库类型vector
 
 -   vector所有对象的类型都相同
 -   vector也常被称为容器 
@@ -867,6 +867,9 @@ for ( auto &c :s )
 -   通过一些额外信息来指定模板到底实例化成什么样的类，即在模板名字后面跟一对尖括号，在括号内放在信息上
 
 ```c
+#include <vector>
+using std::vector
+
 vector<int> ivec;
 vector<vector<string>> file;  //该向量的元素是vector对象
 ```
