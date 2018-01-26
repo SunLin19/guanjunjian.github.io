@@ -2502,6 +2502,12 @@ int a2[scale(i)]; //错误，scale(i)不是常量表达式
 
 -   如果我们用一个非常量表达式调用scale，比如int类型的i，则返回值是一个非常量表达式，当把scale放在需要常量表达式的上下文时，由编译器检查函数的结果是否符合要求，如果结果不是常量表达式，编译器将发出错误信息
 -   constexpr函数不一定返回常量表达式
+-   根据[C++ const 和 constexpr 的区别？][15]
+
+> constexpr表示这玩意儿在编译期就可以算出来（前提是为了算出它所依赖的东西也是在编译期可以算出来的）。而const只保证了运行时不直接被修改（但这个东西仍然可能是个动态变量）。
+> const并未区分出编译期常量和运行期常量;constexpr限定在了编译期常量
+> constexpr修饰的函数，返回值不一定是编译期常量
+> constexpr修饰的函数，简单的来说，如果其传入的参数可以在编译时期计算出来，那么这个函数就会产生编译时期的值。但是，传入的参数如果不能在编译时期计算出来，那么constexpr修饰的函数就和普通函数一样了。不过，我们不必因此而写两个版本，所以如果函数体适用于constexpr函数的条件，可以尽量加上constexpr
 
 ### 6.5.3 调试帮助
 
@@ -3515,3 +3521,4 @@ private:
 [12]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_5_1.png "表5.1 <stdexcept>定义的异常类"
 [13]:https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_6_1.png "表6.1 initializer_list提供的操作"
 [14]:https://guanjunjian.github.io/2018/01/09/study-19-pointers-on-c-summary "《C和指针》笔记"
+[15]:https://www.zhihu.com/question/35614219/answer/63681192 "C++ const 和 constexpr 的区别？"
