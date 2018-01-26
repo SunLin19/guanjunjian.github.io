@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "「二十」《C++Primber》笔记 第Ⅰ部分"
+title:      "「二十」《C++Primber》笔记 第Ⅰ部分 "
 date:       2018-01-19 15:00:00
 author:     "guanjunjian"
 categories: 阅读
@@ -13,7 +13,9 @@ tags:
 {:toc}
 
 >
-> 《C++Primer》 （第5版）第Ⅰ部分 C++基础 笔记
+> 《C++Primer》笔记 第Ⅰ部分 C++基础
+> 
+> 第五版 
 >
 
 # 第1章 开始
