@@ -3515,6 +3515,11 @@ private:
     static const char bkground;
 }
 ```
+---
+
+# 参考
+
+* *1.[C++ 值初始化和默认初始化](https://www.cnblogs.com/lustar/p/7450097.html)*
 
 ---
 
