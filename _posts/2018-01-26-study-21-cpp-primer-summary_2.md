@@ -1678,7 +1678,7 @@ while(map_it!=word_count.cend())
 -   在迭代器和初始化列表中的元素，对于一个给定的关键字，只有第一个带此关键字的元素才被插入到容器中
 
 ```c
-map<string,int> test = {{"abc",1},{"def",2},{"abc",3}};
+map<string,int> test = { {"abc",1}, {"def",2}, {"abc",3} };
 cout << test["abc"] << endl;
 //输出为：1
 ```
