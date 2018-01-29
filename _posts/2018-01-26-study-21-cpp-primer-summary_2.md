@@ -1516,4 +1516,333 @@ remove_copy_if(v1.begin(),v1.end(),back_inserter(v2),
 -   算法从不会直接改变它们所操作的序列的大小。它们将元素从一个位置拷贝到另一个位置，但不会直接添加或删除元素
 -   容器`forward_list`和list对一些通用算法定义了自己的特有的版本。与通用算法不同，这些链表特有版本会修改给定的链表
 
+---
+
+# 第11章 关联容器
+
+-   参考[《关联容器概述》](http://www.cnblogs.com/wuchanming/p/3923756.html)
+-   关联容器中的元素是按关键字来保存和访问的
+-   顺序容器中的元素是按它们在容器中的位置来顺序保存和访问的
+-   两个主要的关联容器类型是map和set
+    -   map中的元素是一些关键字-值对
+    -   set中每个元素包含一个关键字
+-   标准库提供8个关联容器，这8个容器间的不同体现在三个维度上：
+    -   或者是一个set，或者是一个map
+    -   或者要求不重复的关键字，或者允许重复关键字
+    -   按顺序保存元素，或无序保存
+-   map和multimap定义在头文件map中
+-   set和multiset定义在头文件set中
+-   无序容器则定义在头文件`unordered_map`和`unordered_set`中
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_1.png)
+
+---
+
+## 11.2 关联容器概述
+
+-   关联容器（有序的和无序的）都支持9.2节中介绍的普通容器操作   
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_9_2_1.png)
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_9_2_2.png)
+
+-   关联容器不支持顺序容器的位置相关的操作，例如`push_front`或`push_back`
+-   关联容器也不支持构造函数或插入操作这些接受一个元素值和一个数量值的操作 
+
+### 11.2.1 定义关联容器
+
+-   每个关联容器都定义了一个默认构造函数，它创建一个指定类型的空容器
+-   我们也可以将关联容器初始化为另一个同类型容器的拷贝，或是从一个值范围来初始化关联容器，只要这些值可以转化为容器中所需类型就可以
+
+```c
+map<string,size_t> word_count ; //空容器
+//列表初始化
+set<string> exclude={"the","but","and","or","an","a","The","But","And","Or","An","A"};
+//三个元素；authors将姓映射到名
+map<string,string> autors={ {"Joyce","James"},
+　　　　　　　　　　　　  {"Austen","Jane"},
+　　　　　　　　　　　　  {"Dickens","Charles"}};
+```
+
+#### 初始化multimap或multiset
+
+-   一个map或set中的关键字必须是唯一的
+-   multimap和multiset没有此限制，它们都允许多个元素具有相同的关键字
+
+### 11.2.2 关键字类型的要求
+
+-   对于有序容器——map、multimap、set以及multiset，关键字类型必须定义元素比较的方法。默认情况下，标准库使用关键字类型的<运算符来比较两个关键字
+
+#### 有序容器的关键字类型
+
+-   所提供的操作必须在关键字类型上定义一个严格弱序。可以将严格弱序看作“小于等于”
+-   如果两个关键字是等价的（即，任何一个都不“小于等于”另一个），那么容器将它们视作相等来处理。当用作map关键字时，只能有一个元素与这个关键字关联，我们可以用两者中任意一个来访问对应的值
+
+#### 使用关键字的比较函数
+
+-   用来组织一个容器中元素的操作的类型也是容器类型的一部分
+-   用尖括号指出要定义哪种类型的容器，自定义的操作类型必须在尖括号中紧跟这元素类型给出
+-   当我们创建一个容器（对象）时，才会以构造函数参数的形式提供真正的比较操作（其类型必须与在尖括号中指定的类型相吻合）
+-   我们不能直接定义一个`Sales_data`的multiset，因为`Sales_data`没有<运算符
+-   可以用compareIsbn函数来定义一个multiset
+
+```c
+bool compareIsbn(const Sales_data &lhs,const Sales_data &rhs)
+{
+　　return lhs.isbn()<rhs.isbn();
+}
+
+//提供两个类型：关键字类型Sales_data，以及比较操作类型（应该是一种函数指针类型）
+//用compareIsbn来初始化bookstore对象，这表示当我们向bookstore添加元素时，通过compareIsbn来为这些元素排序
+//也可以是bookstore(&compareIsbn)，因为函数名会自动转换为函数指针
+multiset<Sales_data,decltype(compareIsbn)*> bookstore(compareIsbn);
+```
+
+### 11.2.3 pair类型
+
+-   pair，标准库类型，定义在头文件utility
+-   pair的默认构造函数对数据成员进行值初始化（即int类型初始化为0、string初始化为空字符串等）
+-   也可以为每个成员提供初始化器：
+
+```c
+//创建了一个名为author的pair，两个成员被初始化为"James"和"Joyce"。
+pair<string,string> author{"James","Joyce"};
+```
+
+-   pair的数据成员是public的
+-   两个成员分别命名为first和second，用普通的成员访问符号来访问它们
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_2.png)
+
+#### 创建pair对象的函数
+
+```c
+pair<string,int>
+process(vector<string> &v)
+{
+    //处理v
+    if(!v.empty())
+        return {v.back(),v.back().size()); // 列表初始化
+    else
+        return pair<string,int>();  //隐式构造返回值
+}
+
+//在较早的C++版本中，不允许用花括号包围的初始化器来返回pair这种类型的对象，必须显示构造返回值：
+if(!v.empty())
+　　return pair<string,int>(v.back(),v.back().size());
+
+//还可以用make_pair来生成pair对象
+if(!v.empty())
+　　return make_pair(v.back(),v.back().size());
+```
+
+---
+
+## 11.3
+
+-   参考[《关联容器操作》](http://www.cnblogs.com/wuchanming/p/3923761.html)
+-   除了上面的表9.2中提到了类型，关联容器还定义了如下表所示的类型
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_3.png)
+
+-   由于我们不能改变一个元素的关键字，因此这些pair的关键字部分是const的
+
+### 11.3.1 关联容器迭代器
+
+-   当解引用一个关联容器的迭代器时，我们会得到一个类型为容器的valued_type的值的引用
+-   对map而言，value_type是一个pair类型，它的first即关键字是const的，不能修改
+
+#### set的迭代器是const的
+
+-   虽然set类型同时定义了iterator和const_iterator类型，但两种类型都只允许只读访问set中的元素。一个set中的关键字也是const的
+
+#### 遍历关联容器
+
+-   map和set类型都支持表9.2中的begin和end操作
+
+```c
+//获取一个指向首元素的迭代器
+auto map_it=word_count.cbegin();
+//比较当前迭代器和尾后迭代器
+while(map_it!=word_count.cend())
+{
+    //解引用迭代器，打印关键字-值对
+    cout<<map_it->first<<" occurs "<<map_it->second<<" times" <<endl;
+    ++map_it; //递增迭代器，移动到下一个元素
+}
+```
+
+### 11.3.2 添加元素
+
+-   由于map和set（以及对应的无序类型）包含不重复的关键字，因此插入一个已经存在的元素对容器没有任何影响
+-   insert有两个版本，分别接受一对迭代器，或是一个初始化列表
+-   在迭代器和初始化列表中的元素，对于一个给定的关键字，只有第一个带此关键字的元素才被插入到容器中
+
+```c
+map<string,int> test = {{"abc",1},{"def",2},{"abc",3}};
+cout << test["abc"] << endl;
+//输出为：1
+```
+
+#### 向map添加元素
+
+-   向word_count插入word的4种方法
+
+```c
+word_count.insert({word,1});
+word_count.insert(make_pair(word,1));
+word_count.insert(pair<string,size_t>(word,1));
+word_count.inset(map<string,size_t>::value_type(word,1));
+```
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_4.png)
+
+#### 检测insert的返回值
+
+-   如果关键字已经在容器中，则insert什么事情也不做，且返回值中的bool部分为false；second部分是匹配到的相同关键字的元素的迭代器
+
+#### 向multiset或multimap添加元素
+
+-   在这些类型上调用insert总会插入一个元素
+-   对允许重复关键字的容器，接受单个元素的insert操作返回一个指向新元素的迭代器
+
+### 11.3.3 删除元素
+
+-   对于保存不重复关键字的容器，erase的返回值总是0或1
+-   对允许重复关键字的容器，删除元素的数量可能大于1
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_5.png)
+
+### 11.3.4 map的下标操作
+
+-   map和unordered_map容器提供了下标运算符和一个对应的at函数
+-   set类型不支持下标，因为set中没有与关键字相关联的“值”
+-   不能对一个multimap和unordered_multimap进行下标操作，因为这些容器中可能有多个值与一个关键字相关联
+-   由于下标运算符可能插入一个新元素，我们只可能对非const的map使用下标操作
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_6.png)
+
+#### 使用下标操作的返回值
+
+-   通常情况下，解引用一个迭代器所返回的类型与下标运算符返回的类型是一样的
+-   但对map则不然，当对一个map进行下标操作时，会获得一个`mapped_type`对象；但当解引用一个map迭代器时，会得到一个`value_type`对象，即pair
+
+### 11.3.5 访问元素
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_7_1.png)
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_7_2.png)
+
+#### 在multimap和multiset中查找元素
+
+-   如果一个multimap或multiset中有多个元素具有给定关键字，则这些元素在容器中相邻存储
+-   例如，给定一个从作者到著作题目的映射，我们可能想打印一个特定作者的所有著作。可以用三种不同方法来解决这个问题
+    -   最直观的方法:使用find和count
+    -   使用`lower_bound`和`upper_bound`
+    -   使用`equal_range`
+
+#### 使用find和count
+
+```c
+string search_item("Alain de Botton");    //要查找的作者
+auto entries=authors.count(search_item);   //元素的数量
+auto iter=authors.count(search_item);　　//此作者的第一本书
+while(entries)
+{
+　　cout<<iter->second<<endl;
+　　++iter;
+　　--entires;
+}
+```
+
+#### 使用lower_bound和upper_bound
+
+```c
+for(auto beg=authors.lower_bound(search_item),
+        end=authors.upper_bound(search_item) ; beg != end; ++beg)
+        cout<<beg->second<<endl;    //打印每个题目
+```
+
+-   lower_bound返回的迭代器指向第一个具有给定关键字的元素
+-   upper_bound返回的迭代器指向最后一个匹配给定关键字的元素之后的位置
+-   如果元素不在容器中，则`lower_bound`和`upper_bound`会返回相等的迭代器——指向一个不影响排序的可插入位置
+-   如果我们查找的元素具有容器中最大的关键字，则此关键字的`upper_bound`返回尾后迭代器
+-   如果关键字不存在，且大于容器中任何关键字，`lower_bound`返回尾后迭代器
+
+#### 使用`equal_range`
+
+```c
+//pos保存迭代器，表示与关键字匹配的元素范围
+for(auto pos = authors.equal_range(search_item); pos.first != pos.second; ++pos.first)  
+{  
+    cout << pos.first->second << endl;  
+}  
+```
+
+---
+
+## 11.4 无序容器
+
+-   参考[《无序容器》](http://www.cnblogs.com/wuchanming/p/3923766.html)
+-   4个无序关联容器，这些容器不是使用比较运算符来组织元素，而是使用一个哈希函数和关键字类型的==运算符
+
+#### 使用无序容器
+
+-   用于map和set的操作也能用于`unordered_map`和`unordered_set`
+
+#### 管理桶
+
+-   无序容器在存储上组织为一组桶，每个桶保存零个或多个元素
+-   无序容器使用一个哈希函数将元素映射到桶
+-   为了访问一个元素，容器首先计算元素的哈希值，它指出应该搜索哪个桶
+-   容器将具有一个特定哈希值的所有元素都保存在相同的桶中
+-   如果容器允许重复关键字，所有具有相同的关键字的元素也都会在同一个桶中
+-   无序容器的性能依赖于哈希函数的质量和桶的数量和大小
+-   将不同关键字的元素映射到相同的桶也是允许的
+-   当一个桶保存多个元素时，需要顺序搜索这些元素来查找我们想要的那个
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_11_8.png)
+
+#### 无序容器对关键字类型的要求
+
+-   默认情况下，无序容器使用关键字类型的==运算符来比较元素，还使用一个hash<key_type>类型的对象来生成每个元素的哈希值
+-   标准库为以下几个类型提供了内置模板，因此它们可以直接定义为关键字
+    -   内置类型（包括指针）
+    -   string
+    -   智能指针类型
+-   我们不能直接定义关键字类型为自定义类类型的无序容器。必须提供我们自己的hash模板版本，将在16.5介绍如何提供自己的hash模板
+-   如果不使用默认的hash，可以用另一种方法创建自定义类类型的无序容器，类似于为有序容器提供关键字类型的默认比较操作
+-   为了能将自定义类类型Sales_data用作关键字，我们需要提供函数来替代==运算符和哈希值计算函数。我们从定义这些重载函数开始：
+
+```c
+size_t hasher(const Sales_data &sd)
+{
+　　return hash<string>()(sd.isbn());
+}
+
+bool eqOp(const Sales_data &lhs,const Sales_data &rhs)
+{
+　　return lhs.isbn()==rhs.isbn();
+}
+
+//使用这些函数来定义一个unordered_multiset
+using SD_multiset=unordered_multiset<Sales_data,decltypr(hasher)*,decltype(eqOp)*>;
+//参数是桶大小、哈希函数指针和相等型判断运算符指针
+SD_multiset bookstore(42,hasher,eqOp);
+
+//如果我们的类定义了==运算符，则可以只重载哈希函数
+//使用FooHash生成哈希值；Foo必须有==运算符
+//参数是桶大小、哈希函数指针
+unordered_set<Foo,decltype(FooHash)*> fooset(10,FooHash);
+```
+
+---
+
+## 小结
+
+-   有序容器使用比较函数来比较关键字，从而将元素按顺序存储。默认情况下，比较操作是采用关键字类型的<运算符
+-   无序容器使用关键字类型的==运算符和一个hash<key_type>类型的对象来组织元素
+-   无论在有序容器还是在无序容器中，具有相同关键字的元素都是相邻存储的
+
+
+
+
 
