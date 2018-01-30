@@ -665,6 +665,12 @@ auto &m = ci, *p = &ci; //m是对整型常量的引用，p是指向整型常量�
 auto &n = i; *p2 = &ci; //错误，i的类型是int，而&ci是const int
 ```
 
+-	对于const和auto一起使用时
+
+```c
+auto const p = getP(); //函数的返回为一个普通的指针，则auto推出的是指针类型，又加上const关键字，所以p是常量指针
+```
+
 ### 2.5.3 decltype类型指示符
 
 -   decltype的作用是选择并返回操作数的数据类型，编译器分析表达式并得到它的类型，却不实际计算表达式的值
