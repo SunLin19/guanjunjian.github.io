@@ -1842,6 +1842,640 @@ unordered_set<Foo,decltype(FooHash)*> fooset(10,FooHash);
 -   无序容器使用关键字类型的==运算符和一个hash<key_type>类型的对象来组织元素
 -   无论在有序容器还是在无序容器中，具有相同关键字的元素都是相邻存储的
 
+---
+
+# 第12章 动态内存
+
+-   参考[《动态内存和智能指针》](http://www.cnblogs.com/wuchanming/p/4053685.html)
+
+---
+
+##### 静态内存
+
+-   静态内存用来保存
+    -   局部static对象
+    -   类static数据成员
+    -   定义在任何函数之外的变
+-   静态内存中的对象由编译器自动创建和销毁   
+-   static对象在使用之前分配，在程序结束时销毁
+
+
+##### 栈内存
+
+-   栈内存用来保存
+    -   函数内的非static对象
+-   栈内存中的对象由编译器自动创建和销毁
+-   栈对象，仅在其定义的程序块运行时才存在
+
+#### 堆
+
+-   每个程序还拥有一个内存池。这部分内存被称作自由空间或堆
+-   程序用堆来存储动态分配的对象，即程序运行时分配的对象
+-   动态对象的生存期由程序来控制，当动态对象不再使用时，我们的代码必须显式地销毁它们
+
+---
+
+## 12.1 动态内存和智能指针
+
+-   new：在动态内存中为对象分配空间并返回一个指向该对象的指针，我们可以选择对对象进行初始化
+-   delete：接受一个动态对象的指针，销毁该对象，并释放与之关联的内存
+-   动态内存容易出现的问题
+    -   内存泄漏：忘记释放内存
+    -   引用非法内存的指针：引用非法内存的指针
+-   智能指针：它负责自动释放所指向的对象
+-   新的标准库提供了两种智能指针类型来管理动态对象，区别在于管理底层指针的方式
+    -   `shared_ptr`：允许多个指针指向同一对象
+    -   `unique_ptr`：“独占”所指向的对象
+    -   `weak_ptr`的伴随类，它是一种弱引用，指向shared_ptr所管理的对象
+
+### 12.1.1 shared_ptr类
+
+-   智能指针也是模板
+
+```c
+shared_ptr<string> p1 ; //shared_ptr,可以指向string
+shared_ptr<list<int> > p2;  //shared_ptr,可以指向int的list
+```
+
+-   默认初始化的智能指针中保存着一个空指针
+-   智能指针的使用方式与普通指针类似
+-   表12.1列出了`shared_ptr`和`unique_ptr`都支持的操作
+-   表12.2列出了shared_ptr独有的操作
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_1.png)
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_2.png)
+
+#### make_shared函数
+
+-   最安全的分配和使用动态内存的方法是调用一个名为make_shared的标准库函数
+-   定义在头文件memory中
+
+```c
+//指向一个值为42的int的shared_ptr
+shared_ptr<int> p3=make_shared<int> (42);
+//p4指向一个值为"99999"的string
+shared_ptr<string> p4=make_shared<string> (5,'9');
+//p5指向一个值初始化的int，即，值为0
+shared_ptr<int> p5=make_shared<int> ();
+
+//p6指向一个动态分配的空vector<string>
+auto p6=make_shared<vector<string>> ();
+```
+
+#### shared_ptr的拷贝和赋值
+
+-   当进行拷贝或赋值时，每个`shared_ptr`都会记录有多少个其他`shared_ptr`指向相同的对象  
+-   每个`shared_ptr`都有一个关联的计数器，通常称其为引用计数
+-   无论何时我们拷贝一个`shared_ptr`，计数器都会递增
+    -   当用一个`shared_ptr`初始化另一个`shared_ptr`
+    -   将它作为参数传递给一个函数
+    -   作为函数的返回值
+-    当我们给`shared_ptr`赋予一个新值或是`shared_ptr`被销毁
+    -   局部的shared_ptr离开其作用域时
+-   一旦一个shared_ptr的计算器变为0，它就会自动释放自己所管理的对象
+
+```c
+auto r=make_shared<int>(42);  //r指向的int只有一个引用者
+//给r赋值，令它指向另一个地址
+//递增q指向的对象的引用计数
+//递减r原来指向的对象的引用计数
+//r原来指向的对象已没有引用者，会自动释放
+r=q; 
+```
+
+-   到底是用一个计数器还是其他数据结构来记录有多少指针共享对象，完全由标准库的具体实现决定
+
+#### shared_ptr自动销毁所管理的对象……
+
+-   当指向一个对象的最后一个`shared_ptr`被销毁时，`shared_ptr`类会自动销毁此对象
+-   通过析构函数完成销毁工作
+-   每个类都有一个析构函数，构函数控制此类型的对象销毁时做什么操作。析构函数一般用来释放对象分配的资源
+
+#### ……shared_ptr还会自动释放相关联的内存
+
+```c
+void use_factory(T arg)
+{
+    shared_ptr<Foo> p=factory(arg);
+    //使用p
+    return p; //当我们返回p时，引用计数进行了递增操作
+} //p离开了作用域，但它指向的内存不会被释放
+```
+
+-   对于一块内存，`shared_ptr`类保证只要有任何`shared_ptr`对象引用它，它就不会被释放掉
+-   如果你忘记了销毁程序不再需要的shared_ptr，程序仍会正确执行，但会浪费内存
+
+#### 使用了动态生存期的资源的类
+
+-   程序使用动态内存处于以下三种原因之一：
+    -   程序不知道自己需要使用多少个对象（容器类）
+    -   程序不知到所需的准确类型（15章将会介绍）
+    -   程序需要在多个对象间共享数据（shared_ptr指针）
+
+### 12.1.2 直接管理内存
+
+-   参考[《直接管理内存》](http://www.cnblogs.com/wuchanming/p/4174106.html)
+-   自己直接管理内存的类与使用智能指针的类不同，它们不能依赖类对象拷贝、赋值和销毁操作的任何默认定义 
+
+#### 使用new动态分配和初始化对象
+
+-   在自由空间分配的内存是无名的
+-   new无法为其分配的对象命名，而是返回一个执行对象的指针
+
+```c
+int *pi=new int ;// pi指向一个动态分配的、未初始化的无名对象
+```
+
+-   动态分配的对象是默认初始化的。内置类型或组合类型的对象的值将是未定义的，而类类型对象将用默认函数进行初始化
+
+```c
+string *ps=new string; //初始化为空string，string类的默认初始化就是空string
+int *pi=new int ; // pi指向一个未初始化的int，值未知
+```
+
+#### 动态分配对象初始化方式
+
+-   可以使用直接初始化方式或值初始化方式
+-   可以使用直接初始化方式（不使用等号就是直接初始化）来初始化一个动态分配的对象
+    -   使用传统的构造方式（使用圆括号）
+    -   使用列表初始化（使用花括号）
+
+```c
+//直接初始化动态对象的例子
+int *pi=new int(1024)  ;//pi的对象的值为1024
+string *ps=new string(10,'9') ; //vector有10个元素，值依次从0到9
+vector<int> *pv=new vector<int>{0,1,2,3,4,5,6,7,8,9};
+```
+
+-   对动态的对象进行值初始化，只需在类型名之后根一对空括号即可
+
+```c
+//值初始化动态对象的例子
+string *ps1=new string;   //默认初始化为空string，string类的默认初始化就是空string
+string *ps=new string();  //值初始化为空string
+int *pi1=new int; //默认初始化：*pi1的值未定义
+int *pi2=new int();   // 值初始化为0 *pi2为0
+```
+
+-   对于定义与自己的构造函数的类类型（例如string）来说，要求值初始化是没有意义的；不管采用什么形式，对象都会通过默认构造函数来初始化
+-   对于内置类型，两种形式的差别就很大了（对于内置类型，默认初始化与值初始化的区别）
+    -   值初始化：值初始化的内置类型对象有着良好定义的值
+    -   默认初始化：默认初始化的对象的值则是未定义的
+-   对于类中那些依赖于编译器合成的默认构造函数的内置类型成员，如果它们未在类内被初始化，进行的是默认初始化，那么它们的值也是未定义的
+
+---
+
+-   如果我们提供了一个括号包围的初始化器，就可以使用auto从此初始化器来推断我们想要分配的对象的类型
+-   只有当括号中仅有单一初始化器时才可以使用auto
+
+```c
+auto p1=new auto(obj) ; //p指向一个与obj类型相同的对象
+auto p2=new auto(a,b,c) ;  //错误：括号中只能有单个初始化器
+```
+
+#### 动态分配的const对象
+
+-   用new分配const对象是合法的
+-   一个动态分配的const对象必须进行初始化
+-   对于一个定义了默认构造函数的类类型，其const动态对象可以隐式初始化，而其他类型的对象就必须显式初始化
+
+```c
+//分配并初始化一个const int
+const int *pci=new const int(1024);
+//分配并默认初始化一个const的空string
+const string *pcs=new const string;
+```
+
+#### 内存耗尽
+
+-   一旦一个程序用光了它所有可用的内存，new表达式就会失败
+-   如果new不能分配所要求的内存空间，它就会抛出一个类型为bad_alloc的异常
+-   如果分配失败，new返回一个空指针
+
+```c
+int *p1=new int ; //如果分配失败，new抛出std::bad_alloc
+int *p2=new (nothrow) int ; //如果分配失败，new返回一个空指针
+```
+
+-   可以改变使用new的方式来阻止它抛出异常：如上第二句。称这种形式的new为定位new
+-   定位new表达式允许我们向new传递额外的参数
+-   在此例中，我们传递给它一个由标准库定义的名为nothrow的对象，意图是告诉它不能抛出异常
+-   bad_alloc和nothrow都定义在头文件new中
+
+#### 释放动态内存
+
+-   通过delete表达式来将动态内存归还给系统
+-   delete表达式接受一个指针，指向我们想要释放的对象。该指针必须指向一个动态分配的对象或是一个空指
+-   释放一块并非new分配的内存，或者将相同的指针值释放多次，其行为都是未定义的
+-   delete包括两个动作
+    -   销毁给定的指针指向的对象
+    -   释放对应的内存
+
+```c
+int i,*pi1=&i,*pi2=nullptr;
+double *pd=new double(33),*pd2=pd;
+delete i;  //错误，i不是一个指针
+delete pi1; //未定义：pi1执行一个局部变量
+delete pd; //正确
+delete pd2;  //未定义，pd2指向的内存已经被释放了
+delete pi2;  //正确：释放一个空指针总是没有错误的
+```
+
+-   虽然一个const对象的值不能被改变，但它本身是可以被销毁的
+
+```c
+const int *pci=new const int(1024); 
+delete pci; //正确：释放一个从const对象
+```
+
+#### 动态对象的生存期直到被释放时为止
+
+-   由内置指针（而不是智能指针）管理的动态内存在被显式释放前一直都会存在
+
+```c
+void use_factory(T arg)
+{
+　　Foo *p=factory(arg);
+　　//使用p但不delete它
+} //p离开了它的作用域，但它所指向的内存没有被释放
+```
+
+#### delete之后重置指针值……
+
+-   当我们delete一个指针后，指针值就变为无效了
+-   但指针仍然保存着（已经释放了的）动态内存的地址
+-   指针就变成了的空悬指针，即指向一块曾经保存数据对象但现在以及无效的内存的指针
+-   如果我们需要保留指针，可以在delete之后将nullptr赋予指针，这样就不会产生空悬指针了
+
+#### ……这只是提供了有限的保护
+
+-   可能有多个指针指向相同的内存，在delete内存之后重置指针的方法只对这个指针有效，对其他任何指向（已释放的）内存的指针是没有作用的
+
+```c
+int *p(new int (42));  //p指向动态内存
+auto q=p;  //p和q指向相同的内存
+delete p; //p和q均变为无效
+p=nullptr;  //指出p不再绑定到任何对象，但q仍然是空悬指针
+```
+
+### 12.1.3 shared_ptr和new结合使用
+
+```c
+shared_ptr<int> p2(new int(42)); //p2指向一个值为42的int
+```
+
+-   接受指针参数的只能指针函数是explicit的，因此不能将一个内置指针隐式转换为一个智能指针，必须使用直接初始化形式
+
+```c
+shared_ptr<int> p1(new int(42));//正确，使用了直接初始化形式
+shared_ptr<int> p2 = new int(1024);//错误，不能将一个内置指针隐式转化为智能指针
+
+shared_ptr<int> clone(int p){
+    return new int(p); //错误，这里是隐式转换为shared_ptr<int>
+}
+
+shared_ptr<int> clone(int p){
+    return shared_ptr<int>(new int(p)); //正确，显示地用int*创建shared_ptr<int>
+}
+```
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_3_1.png)
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_3_2.png)
+
+#### 不要混合使用普通指针和智能指针……
+
+```c
+void process(shared_ptr<int> ptr){
+    //使用ptr
+}//离开作用域，ptr被销毁
+
+shared_ptr<int> p(new int(42));//p的引用计数为1
+process(p);//拷贝p，增加的p的引用计数，这时p的引用计数为2
+int i = *p;//此时，离开process作用域，p的引用计数减1，变为1
+
+//下面是错误示范
+
+int *x(new int(24));//x是一个普通指针，不是智能指针
+process(x);//错误，不能将int*转化为一个shared_ptr
+process(shared_ptr<int>(x));//合法的，但是离开process作用域的时候，这个智能指针指向的内存会被释放，因为作为临时的shared_ptr指针，它在x作为实参赋值时，计数为1，离开函数后计数为0，就会释放x指向的内存
+int j = *x;//未定义的，因为x是个空悬指针，内存已经被释放了
+```
+
+-   当我们将一个`shared_ptr`绑定到一个普通指针时，就将内存管理责任交给了`shared_ptr`。一旦这样做了，我们就不应该再使用内置指针来访问`shared_ptr`所指向的内存了
+-   使用一个内置指针来访问一个智能指针所负责的对象是很危险的，因为我们无法知道对象何时被销毁
+
+#### ……也不要使用get初始化另一个智能指针或者为智能指针赋值
+
+-   智能指针的get函数返回一个内置指针，指向智能指针管理的对象
+-   get函数的使用场景：向不能使用智能指针的代码传递一个内置指针
+-   使用get返回的指针的代码不能delete此指针
+
+```c
+shared_ptr<int> p(new int(42)); //引用计数为1
+int *q=p.get();             //正确：但使用q时要注意，不要让它管理的指针被释放
+{
+//新程序块
+//未定义：两个独立的shared_ptr指向相同的内存
+    shared_ptr<int>(q);
+}//程序块结束，q被销毁，它指向的内存被释放，即p指向的内存被释放了
+int foo=*p; //未定义：p指向的内存已经被释放了
+```
+
+### 12.1.4 智能指针和异常
+
+-   参考[《C++智能指针》](https://www.2cto.com/kf/201604/497349.html)
+-   如果使用智能指针，即使程序块过早结束（如发生异常），智能指针类也能确保在内存不再需要时将其释放
+-   在new之后，对应的delete之前发生异常时
+    -   内置指针管理的内存，即使用直接管理的内存是不会自动释放的
+    -   且异常未被捕获，那么该内置指针指向的内存则永远不会被释放了
+
+---
+
+-   为了正确使用智能指针，我们必须坚持以下基本规范：
+    -   不使用相同的内置指针初始化（或reset）多个智能指针 
+    -   不delete get()返回的指针
+    -   不使用get()初始化或reset另一个智能指针
+    -   如果你使用get()返回的指针，记住当最后一个对应的智能指针销毁后，你的指针就变为无效了
+    -   如果你用智能指针管理的资源不是new分配的内存，记住传递给它一个删除器（例如指向的是一个类对象）
+
+#### 12.1.5 unique_ptr
+
+-   某个时刻只能有一个`unique_ptr`指向一个给定对象。当`unique_ptr`被销毁时，它所指向的对象也被销毁
+-   unique_ptr支持的操作如下表12.1和12.4
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_1.png)
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_4.png)
+
+-   当我们定义一个unique_ptr时，需要将其绑定到一个new返回的指针上
+-   初始化`unique_ptr`必须采用直接初始化形式（不使用等号）
+
+```c
+unique_ptr<int> p2(new int(42));//p2指向一个值为42的int
+```
+-   由于一个`unique_ptr`拥有（且只能它拥有）它指向的对象，因此`unique_ptr`不支持普通的拷贝或赋值操作
+
+```c
+unique_ptr<string> p1(new string("hello"));
+unique_ptr<string> p2(q1); //错误，unique_ptr不支持拷贝
+unique_ptr<string> p3;
+p3 = p2; //错误，unique_ptr不支持赋值
+```
+
+-   但可以通过调用release或reset将指针的所有权从一个（非const）`unique_ptr`转义给另一个`unique_ptr`
+
+```c
+/将所有权从p1转移给p2
+unique_ptr<string> p2(p1.release());  //release将p1置为空
+unique_ptr<string> p3(new string(“Trex”));
+//将所有权从p3转移给p2
+p2.reset(p3.release());  //reset释放了p2原来指向的内存
+```
+
+-   release返回的指针通常被用来初始化另一个智能指针或给另一个智能指针赋值
+-   如果我们不用另一个智能指针来保存release返回的指针，我们的程序就要负责资源的释放
+
+```c
+p2.release(); //错误，p2不会释放内存，而且我们丢失了指针
+auto p = p2.release(); //正确，但我们必须记得delete(p)
+```
+
+#### 传递unique_ptr参数和返回unique_ptr
+
+-   不能拷贝unique_ptr的规则有一个例外：
+    -   我们可以拷贝或赋值一个将要被销毁的unique_ptr
+    -   最常见的例子是从函数返回一个unique_ptr
+-   在此情况下，编译器执行一种特殊的拷贝，将在13.6.2介绍（移动构造函数和移动赋值运算）
+
+```c
+unique_ptr<int> clone(int p){
+    //正确
+    return unique_ptr<int>(new int(p));
+}
+
+//还可以返回一个局部对象的拷贝
+unique_ptr<int> clone(int p){
+    unique_ptr<int> ret(new int(p))
+    return ret;
+}
+```
+
+#### 向unique_ptr传递删除器
+
+-   unique_ptr默认情况使用delete释放它所指向的对象
+-   可以重载unique_ptr中默认的删除器
+-   `unique_ptr`管理删除器的方式与`shared_ptr`不同，原因将在16.1.6介绍
+-   unique_ptr传入删除器的方法：
+
+```c
+// p指向一个类型为objT的对象,并使用一个类型为delT的对象来释放objT对象;
+// 它会调用一个名为fcn的delT类型对象;
+//在创建或reset一个这种类型的unique_ptr时，必须提供一个指定类型的可调用对象（删除器）
+unique_ptr< objT , delT > p ( new objT, fcn);
+
+//具体的例子
+unique_ptr<connection,decltype(end_connection)*> p(&c,end_connection);
+```
+
+### 12.1.6 weak_ptr
+
+-   weak_ptr是一种不控制所指向对象生成期的智能指针
+-   `weak_ptr`指向由一个`shared_ptr`管理的对象
+-   将一个`weak_ptr`绑定到一个`shared_ptr`不会改变`shared_ptr`的引用计数
+-   `shared_ptr`被销毁，即使`weak_ptr`指向对象，对象也还是会被释放
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_5.png)
+
+-   由于对象可能不存在，不能使用`weak_ptr`直接访问对象，必须调用lock
+-   lock检查`weak_ptr`所指向的对象是否存在，如果存在，lock返回一个指向共享对象的`shared_ptr`
+
+---
+
+## 12.2 动态数组
+
+-   参考[《C++智能指针》](https://www.2cto.com/kf/201604/497349.html)
+
+-   C++语言和标准库提供了两种一次分配一个对象数组的方法
+    -   动态数组的new方式
+    -   allocator类，允许将分配和初始化分离
+-   使用容器的类可以使用默认版本的拷贝、赋值和析构操作
+-   动态数组的类则必须定义自己版本的操作，在拷贝、复制和销毁对象时管理关联的内存
+
+### 12.2.1 new和数组
+
+```c
+int *pia=new int[get_size()];  //pia指向第一个int
+
+//使用类型别名的方式
+typedef int arrT[42]; //arrT表示42个int的数组类型
+int *p = new arrT; //分配一个42个int的数组；p指向第一个int
+//编译器实际上执行的是这样的操作
+int *p = new int[42];
+```
+
+-   方括号中的大小必须是整型，但不必是常量
+
+#### 分配一个数组会得到一个元素类型的指针
+
+-   new返回的是一个元素类型的指针，而不是数组
+-   由于分配的内存并不是一个数组类型，因此不能对动态数组调用begin或end
+-   不能用范围for语句来处理动态数组中的元素
+-   动态数组并不是数组类型
+
+#### 初始化动态分配对象的数组
+
+-   初始化动态分配对象的数组的方法：
+    -   new分配的对象，不管单个分配还是数组中的，都是默认初始化的
+    -   可以对数组中的元素进行值初始化，方法是在后跟一对空括号
+    -   提供元素初始化器的括号列表
+
+```c
+int *pia = new int[10];  //10个未初始化的int
+int *pia2 = new int[10](); //10个值初始化为0的int
+string *psa = new string[10]; //10个空string，因为string类的默认初始化就是空string
+string *psa2 = new string[10](); //10个空string，同默认初始化一样，调用的是string的默认构造函数
+
+//初始化器
+//10个int分别用列表中对应的初始化器初始化
+int *pia3 = new int[10]{0,1,2,3,4,5,6,7,8,9};
+//10个string，前4个用给定的初始化器，剩余的进行值初始化
+string *psa3 = new string[10]{"a","an","the",string(3,'x')};
+```
+
+-   初始化器数目小于元素数目，剩余元素进行值初始化
+-   初始化器数目大于元素数目，new表达式失败，不会分配任何内存，同时抛出`bad_array_new_length`异常
+-   虽然我们用空圆括号对数组中的元素进行值初始化，但不能在圆括号中给出初始器，因此不能用auto分配数组（对于单个分配是可以这样的`auto p1 = new auto(obj);`）
+
+#### 动态分配一个空数组是合法的
+
+-   虽然我们不能创建一个大小为0的静态数组对象，但当n等于0时，调用new[n]是合法的
+-   new返回一个合法的非空指针，此指针保证与new返回的其他任何指针都不相同
+-   此指针就像尾后指针一样
+-   此指针可以的操作：
+    -   向此指针加上（或减去）0
+    -   此指针减去自身得到0
+-   此指针不可以的操作：解引用
+
+```c
+char arr[0]; //错误，不能定义长度为0的内置数组
+char *p = new char[0]; //正确，但cp不能解引用
+```
+
+#### 释放动态数组
+
+```c
+delete p;   //p必须指向一个动态分配的对象或为空
+delete [] pa;   //pa必须指向一个动态分配的数组或为空
+```
+
+-   数组中的元素按逆序销毁，最后一个元素首先被销毁
+-   如果我们在delete一个指向数组的指针时忽略了方括号（或在delete一个指向单一对象的指针时使用了方括号），其行为是未定义的
+-   使用类型别名定义的，delete时也需要使用方括号
+
+```c
+typedef int arrT[42];
+int *p = new arrT;
+delete[] p;
+```
+
+#### 智能指针和动态数组
+
+-   标准库提供了可以管理new分配的数组的unique_ptr版本
+
+```c
+//up指向一个包含10个未初始化int的数组
+unique_ptr<int[]> up(new int[10]);
+up.release();  //自动用delete[]销毁其指针
+```
+
+-   该版本的unique_ptr于表12.1、12.4中所使用的那些操作有一些不同
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_6.png)
+
+-   `shared_ptr`不能直接管理动态数组，需要提供自己定义的删除器，因为默认情况下`shared_ptr`使用的是delete销毁它所指向的对象，如果此对象是动态数组，对其使用delete所产生的问题与释放一个动态数组时忘记[]产生的问题一样
+
+```c
+//为了使用shared_ptr，必须提供一个删除器
+shared_ptr<int> sp(new int[10],[](int *p){delete[] p;});
+sp.reset(); //使用我们提供的lambda释放数组，它使用delete[]
+```
+
+-   `shared_ptr`不直接支持动态数组这一特性会影响我们访问数组中的元素   
+
+```c
+//shared_ptr未定义下标运算，并且不支持指针的算术运算
+for(size_t i = 0, i != 10; i++)
+{
+    *(sp.get()+i) = i; //使用get来获得一个内置指针
+}
+```
+
+### 12.2.2 allocator类
+
+-   new存在灵活上的局限性：将内存分配和对象构造组合在一起
+-   delete存在灵活上的局限性：将对象析构和内存释放组合在一起
+-   将内存分配和对象构造组合在一起可能导致不必要的浪费
+
+---
+
+-   希望将内存分配和对象构造分离，可以分配大块内存，但只在真正需要时才真正执行对象的创建操作（同时付出一定的开销）
+
+#### allocator类
+
+-   标准库allocator类定义在头文件memory中
+-   将内存分配和对象构造分离开来
+-   它提供一种类型感知的内存分配方法
+-   它分配的内存是原始的、未构造的
+-   当一个allocator对象分配内存时，它会根据给定的对象类型来确定恰当的内存大小和对齐位置
+
+```c
+allocator<string> alloc;                //可以分配string的allocator对象
+auto const p=alloc.allocate(n);     //分配n个未初始化的string，这里p是个常量指针
+```
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_7.png)
+
+#### allocator分配未构造的内存
+
+-   allocator分配的内存是未构造的，我们按需要在此内存中构造对象
+
+```c
+auto q=p;                   //q指向最后构造的元素之后的位置，这里应该是认为假设的，是指上一个构造的元素之后的内存位置，即一个未构造的内存位置
+alloc.construct(q++);           //*q为空字符串，并把q指向下一个未构造的内存位置
+alloc.construct(q++,10,’c’);    //*q为cccccccccc，并把q指向下一个未构造的内存位置
+alloc.construct(q++,”hi”);      //*q为hi！，并把q指向下一个未构造的内存位置
+```
+
+-   未构造对象（未construct）的情况下就使用原始内存是错误的
+
+```c
+cout << *p << endl; //正确，使用string的输出运算符
+cout << *q <<endl; //错误，q指向未构造的内存
+```
+
+-   我们只能对真正构造了的元素（construct过的）进行destroy操作
+-   一旦元素被销毁（被destroy之后），可以
+    -   重新使用这部分内存来保存其他该类型的元素
+    -   可以将内存归还给系统
+
+```c
+alloc.deallocate(p,n);  //将内存归还给系统
+```
+
+#### 拷贝和填充未初始化内存的算法
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_12_8.png)
+
+```c
+//分配比vi中元素作战空间大一倍的动态内存
+auto p = alloc.allocate(vi.size()*2); //返回类型为指针
+//通过拷贝vi中的元素来构造从p开始的元素
+auto q = uninitialized_copy(vi.begin(),vi.end,p); //返回值为copy完后的下一个未构造的内存位置的迭代器（指针）
+//将剩余元素初始化为42
+uninitialized_fill_n(q,vi.size(),42);
+```
+
+-   uninitialized_copy返回（递增后的）目的迭代器，即返回一个指针，指向最后一个构造的元素之后的位置   
+
 
 
 
