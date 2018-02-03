@@ -566,5 +566,625 @@ f.sorted(); //调用的是Foo sorted() &
 -   如果一个类未声明以上五个操作，编译器会自动为其合成。如果这些操作未定义为删除的，它们会逐成员初始化、移动、赋值或销毁对象：合成的操作依次处理每个非static的数据成员，根据成员类型确定如何移动、拷贝、赋值或销毁它
 -   一个类需要析构函数，则它肯定也需要定义移动和拷贝构造函数及移动和拷贝赋值运算符
 
+---
+
+# 第14章 重载运算与类型转换
+
+14.1 基本概念
+
+-   重载的运算符是具有特殊名字的函数
+    -   它们的名字由operator加要定义的运算符组成
+-   重载运算符的参数数量与该运算符作用的运算对象一样多，但就作为类成员的重载运算符函数，调用对象是隐式的第一个参数，所以参数列表会比运算符作用的运算对象少一个
+-   除了重载的函数调用运算符operator()之外，其他重载运算符不能含有默认参数
+-   运算符函数，参数至少有一个是类类型（不能全是内置类型），即
+    -   或者是类的成员函数
+    -   或者是至少含有一个类类型的参数的非成员函数
+
+```c
+int operator+(int,int); //非成员函数，错误，不能为int重定义内置的运算符
+```
+
+-   只能重载已有的运算符，不能发明新的运算符号
+-   `+`、`-`、`*`、`&`既是一元运算符，也是二元运算符
+    -   所有这些运算符都能被重载
+    -   从参数的数量可以判断定义的是哪种运算符
+-   重载运算符的优先级和结合律不会改变
+
+---
+
+-   运算符表如下：
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_14_1.png)
+
+#### 直接调用一个重载的运算符函数
+
+-   可以像调用普通函数一样调用运算符函数
+
+```c
+//一个非成员函数的等价调用
+data1+data2;
+operator+(data1,data2);
+
+//成员函数的等价调用
+data1.operator+(data2);
+```
+
+#### 某些运算符不应该被重载
+
+-   逻辑与、逻辑或、逗号运算符因重载版本无法保留求值顺序和/或短路求值属性，因此不建议重载它们
+-   通常情况下也不重载取址符号
+
+#### 使用与内置类型一致的含义
+
+-   重载运算符的返回类型通常下应该与内置版本的返回类型兼容
+
+#### 选择作为成员或非成员
+
+-   有的运算符必须作为成员：赋值（`=`）、下标（`[]`）、调用（`()`）、成员访问箭头（`->`）
+-   含有类对象的混合类型表达式，运算符必须定义成非成员函数，当我们把这样的运算符定义为成员函数时，它的左侧对象必须是运算符所属的类的一个对象，这样就不能交换运算符两侧的对象了
+
+```c
+string s = "word";
+string t = s + "!"; //正确，string类重载了+
+string u = "hi" + s; //如果+是string的成员，则错误
+```
+
+---
+
+## 14.2 输入和输出运算符
+
+### 14.2.1 重载输出运算符<<
+
+-   第一个形参是一个非常量ostream对象的引用
+-   第二个形参是一个常量的引用，该常量是我们要打印的类类型
+-   返回第一个参数的引用
+-   必须是非成员函数
+-   且是第二个参数类类型的友元函数
+
+```c
+ostream &operator<<(ostream &os, const Sales_data &item);
+```
+
+## 14.2.2 重载输入运算符>>
+
+-   第一个形参是运算符将要读取的流的引用
+-   第二个参数是将要读入到的非常量对象的引用
+-   返回某个给定流的引用
+-   必须是非成员函数
+-   且是第二个参数类类型的友元函数
+-   输入运算符必须处理输入可能失败的情况，输出运算符不需要
+
+```c
+istream &operator>>(istream &is, Sales_data &item);
+```
+
+-   可能发生的错误：
+    -   当流含有错误类型的数据读取操作可能失败
+    -   当读取操作到达文件末尾或遇到输入流的其他错误时也会失败
+
+---
+
+## 14.3 算术和关系运算符
+
+-   算术和关系运算符定义成非成员函数以允许左侧或右侧的运算对象进行转换
+-   形参都是常量的引用
+
+```c
+Sales_data operator+(const Sales_data &lhs, const Sales_data &rhs);
+```
+
+### 14.3.1 相等运算符
+
+-   通常情况下，相等运算符来检验两个对象是否相等，会比较对象的每一个数据成员
+-   如果类定义了==，也应该定义!=，反之亦然
+
+```c
+bool operator==(const Sales_data &lhs, const Sales_data &rhs);
+
+bool operator!=(const Sales_data &lhs, const Sales_data &rhs);
+```
+
+### 14.3.2 关系运算符
+
+-   因为关联容器和一些算法要用到小于运算符，所以定义operator<比较有用
+
+---
+
+## 14.4 赋值运算符
+
+-   运算符接受花括号内的元素列表作为参数
+
+```c
+strVec<string> v;
+v = {"a","an","the"};
+
+//这样定义赋值运算符就可以接受元素列表
+strVec &operator=(std::initializer_list<std::string>);
+```
+
+-   无论形参的类型是什么，赋值运算符必须定义为成员函数
+
+#### 复合赋值运算符
+
+```c
+//作为成员函数的二元运算符：左侧对象绑定到隐式的this指针
+Sales_data &Sales_data::operator+=(const Sales_data &rhs);
+```
+
+---
+
+## 14.5 下标运算符
+
+-   必须是成员函数
+-   返回值通常为所访问元素的引用，好处是下标运算符可以出现在赋值运算符的任意一端
+-   如果一个类包含下标运算符，则它通常会定义两个版本：
+    -   返回普通引用
+    -   是类的常量成员并且返回常量引用，用于该类的常量对象的调用
+
+```c
+string& operator[](size_t n);
+const string& operator[](size_t n) const;
+```
+
+---
+
+## 14.6 递增和递减运算符
+
+-   不要求，但建议将其设定为成员函数
+-   应该同时定义前置和后置版本
+-   前置运算符应该返回递增或递减后对象的引用，后置运算符应该返回对象递增或递减前的对象的值（非引用）
+-   通过在后置版本参数中额外添加一个int来区分前置后置，这个形参的唯一作用就是区分前置版本和后置版本，不是真的要在实现后置版本时参与计算
+
+```c
+StrBlobPtr& operator++();  //前置++
+StrBlobPtr operator++(int); //后置++
+```
+
+#### 显示地调用后置运算符
+
+```c
+p.operator++(0); //调用后置版本
+p.operator++(); //调用前置版本
+```
+
+---
+
+## 14.7 成员访问运算符
+
+-   箭头运算符必须是类的成员
+-   解引用运算符通常是类的成员
+
+```c
+class strBlobPtr {
+public:
+    string& operator*() const
+    {
+        auto p = check(curr,"dereference past end");
+        return (*p)[curr];  //(*p)是对象所指的vector
+    }
+    
+    string* operator->() const
+    {
+        //将实际工作委托给解引用运算符
+        return & this->operator*();
+    }
+};
+
+StrBlob a1 = {"hi","bye","now"};
+strBlobPtr p(a1); //p指向a1的首元素赋值
+/*
+给a1的首元素赋值
+相当于：
+string &temp = (*p)[0]
+temp = "okay"
+*/
+*p = "okay"; 
+/*
+打印4，即a1首元素的大小
+相当于：
+string *temp = &((*p)[0])
+size_t c = temp.size();
+cout << c << endl;
+*/
+cout << p->size() <<endl;
+```
+
+#### 对箭头运算符返回值的限定 
+
+-   形如`point->mem`的表达式，point是：
+    -   指向类对象的指针
+    -   重载了operator->的类的对象
+-   point->mem分别等价于
+
+```c
+(*point).mem; //point是一个内置的指针类型
+point.operator->()mem; //point是类的一个对象
+```
+
+-   重载的箭头运算符必须返回：
+    -   类的指针
+    -   自定义了箭头运算符的某个类的对象
+
+---
+
+## 14.8 函数调用运算符
+
+-   如果重载了函数调用运算符，则可以像使用函数一样使用该类的对象
+-   函数调用运算符必须是成员函数
+-   一个类可以定义多个不同版本的调用运算符，相互之间应该在参数数量或类型上有所区别
+-   如果类定义了调用运算符，则该类的对象称作**函数对象**
+
+```c
+struct absInt {
+    int operator()(int val) const {
+        return val < 0 ? -val : val;
+    }
+};
+
+    int i = -42;
+    absInt absObj;             
+    unsigned ui = absObj(i);  //将i传递给absObj.operator()(int)
+```
+
+### 14.8.1 lambda是函数对象
+
+```c
+stable_sort(words.begin(),word.end(),[](const string&a, const string&b)
+                                            { return s1.size() < s2.size(); });
+                                            
+//其行为类似下面这个类的未命名对象
+class shorterString
+{
+public:
+    bool operator()(const string&a, const string&b) const
+    { return s1.size() < s2.size(); }
+}
+```
+
+-   在传入可调用对象的地方传入一个类对象，则会调用该对象的调用运算符
+
+```c
+stable_sort(words.begin(),word.end(),shorterString());
+```
+
+#### 表示lambda及相应捕获行为的类
+
+```c
+auto wc = find_if(words.begin(),word.end(),
+                    [sz](const string &a)
+                        { return a.size() >= sz; } );
+                        
+
+
+//该lambda表达式的类将形如：
+class SizeComp{
+    SizeComp(size_t n):sz(n){} //该形参对于捕获的变量
+    bool operator()(const string &s) const
+        { return s.size() >= sz; }
+private:
+    size_t sz; //该数据成员对应通过值捕获的变量
+};
+
+auto wc = find_if(words.begin(),word.end(),SizeComp(sz));
+```
+
+-   lambda表达式产生的类不含默认构造函数、赋值运算符、默认析构函数；是否含有默认的拷贝/移动构造函数则通常要视捕获的数据成员的类型而定
+
+### 14.8.2 标准库定义的函数对象
+
+-   标准库定义了一组表示算术运算符、关系运算符、逻辑运算符的类，每个类分别定义了一个指向命令操作的调用运算符
+-   这些类都被定义成模板的形式
+-   定义在functional头文件中
+
+```c
+plus<int> intAdd;  //可执行int加法的函数对
+negate<int> intNegate; //可对int值取反的函数对象
+//使用intAdd::operator(int,int)
+int sum = intAdd(10,20); // sum = 30;
+```
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_14_2.png)
+
+#### 在算法中使用标准库函数对象
+
+```c
+//传入临时的函数对象
+//sort比较元素时，不再是使用默认的<运算符，而是调用给定的greater函数对象
+sort(svec.begin(),svec.end(),greater<string>());
+```
+
+### 14.8.3 可调用对象与function
+
+-   可调用对象：
+    -   函数
+    -   函数指针
+    -   lamdba表达式
+    -   bind创建的对象
+    -   重载了函数调用运算符的类
+-   可调用对象也有类型
+-   两个不同类型的可调用对象却可能共享同一种调用形式
+-   调用形式：指明了调用返回的类型以及传递给调用的实参类型
+-   一种调用形式对应一个函数类型
+
+```
+//这是一个函数类型
+int(int,int)
+```
+
+-   定义一个函数表有两个方法：
+    -   使用函数指针
+    -   使用标准库function类型
+
+#### 函数指针实现函数表
+
+```c
+map<string,int(*)(int,int)> binops;
+binops.insert("+",add); //add是一个函数名（也是函数的地址）
+```
+
+#### 标准库function类型实现函数表
+
+-   定义在functional头文件
+-   function是一个模板
+-   function可以用可调用对象来初始化
+
+![](https://raw.githubusercontent.com/guanjunjian/guanjunjian.github.io/master/img/study/study-20-cpp-primer-summary/tb_14_3.png)
+
+```c
+function<int(int,int)> f1 = add; //函数指针
+function<int(int,int)> f2 = divide(); //函数对象类的对象
+function<int(int,int)> f3 = [](int i,int j){ return i*j; }; //lambda
+
+//调用function
+f1(4,2);
+```
+
+-   使用function实现函数表
+
+```c
+map<string,function<int(int,int)>> binops;
+binops.insert("+",add);
+```
+
+#### 重载的函数与function
+
+-   不能（直接）将重载函数的名字存入function类型的对象中，会产生二义性，解决方法有：
+    -   传入的是函数指针，而非函数的名字
+    -   使用lambda表达式
+
+```c
+//函数指针的方式
+int (*fp)(int,int) = add; //指针指向的add是接受两个int的版本
+binops.insert({"+",fp}); //正确，fp指向一个正确的add版本
+
+//lambda的方式
+binops.insert({"+",[](int a,int b){return add(a,b);}});
+```
+
+---
+
+## 14.9 重载、类型转换与运算符
+
+-   **转换构造函数**和**类型转换运算符**共同定义了**类类型转换**，也称为**用户定义的类型转换**
+
+### 14.9.1 类型转换运算符
+
+-   类型转换函数的一般形式:
+
+```c
+operator type() const;
+```
+
+**以下均为类型转换运算符的描述：**
+
+-   type表示某种类型
+-   只要转换的目标类型可以作为返回类型，就允许定义这个类型的转换，因此：
+    -   不允许转换成：数组、函数类型
+    -   可以转换成：指针（包括数组指针、函数指针）、引用类型
+-   必须是类的成员函数
+-   不能声明返回类型，但实际上每个类型转换函数都会返回一个对应类型的值
+-   形参列表必须为空，因为类型转换运算符是隐式执行的，所以无法给这些函数传递实参，当然也就不能在类型转换运算符的定义中使用任何形参
+-   应该是const的
+
+```c
+class SmallInt{
+public:
+    //转换构造函数
+    SmallInt(int i=0):val(i)
+    {
+        if(i<0 || i>255)
+            throw std::out_of_range("Bad SmallInt value");
+    }
+    //类型转换运算符
+    operator int() const { return val; }
+}
+
+SmallInt si;
+si = 4; //首先将4隐式转换为SmallInt（调用转换构造函数），然后调用SmallInt::operator=
+si + 3; //首先将si隐式转换成int（调用类型转换运算符），然后执行整数的加法
+```
+
+-   编译器一次只能执行一次用户定义的类型转换，但是隐式的用户定义类型转换可以置于一个标准（内置）类型转换之前或之后，并与其一起使用
+    -   因此可以将任何算术类型（long int、double一类）传递给SmallInt的构造函数
+    -   也可以用类型转换运算符将一个SmallInt对象转换成Int，再转换成任何其他算术类型
+
+```c
+//内置类型转换将double转为int，再调用SmallInt(int)构造函数
+SmallInt si = 3.14; 
+//SmallInt转为int（调用类型转换运算符），再内置类型转换将int转为double
+si + 3.14
+```
+
+#### 显示的类型转换运算符
+
+```c
+class SmallInt{
+public:
+    //转换构造函数
+    SmallInt(int i=0):val(i)
+    {
+        if(i<0 || i>255)
+            throw std::out_of_range("Bad SmallInt value");
+    }
+    //类型转换运算符，阻止隐式转换
+    explicit operator int() const { return val; }
+}
+
+SmallInt si = 3; //正确，构造函数可以不是显示的
+si + 3; //错误，此处需要隐式类型转换，但类的运算符只能是显示转换
+static_cast<int>(si) + 3; //正确，显示地请求类型转换
+```
+
+-   该规定存在一个例外，即如果表达式被用作条件，则编译器会将显示的类型转换自动应用于它
+
+### 14.9.2 避免有二义性的类型转换
+
+-   产生多重路径有两种情况：
+    -   第一种情况：两个类提供相同的类型转换：例如，当A定义了一个接受B类对象的转换构造函数，同时B类定义了一个转换目标是A类的类型转换运算符，同时存在两种由B获得A的方法，我们就说它们提供了相同的类型转换
+    -   第二种情况：如果类定义了一组类型转换，它们的转换源（或者转换目标）类型本身可以通过其他类型转换联系在一起，则同样会产生二义性的问题。最典型的的例子是算术运算符，某个给定的类，最好只定义最多一个与算术类型有关的转换
+
+#### 情况一：两个类提供相同的类型转换
+
+```c
+struct B;
+
+struct A {
+    A() = default;
+    A(const B&); //把一个B转换成A
+    ...
+};
+
+struct B {
+    operator A() const; //也是一个B转换成A
+    ...
+};
+
+A f(const A&); //一个函数
+B b;
+//二义性错误，同时存在两种由B获得A的方法
+//含义是f(B::operator A())还是f(A::A(const B&))？
+A a = f(b);
+
+//如果显示调用则不会出错
+A a1 = f(b.operator A());
+A a2 = f(A(b));
+```
+
+#### 情况二：二义性与转换目标为内置类型的多重类型转换
+
+```c
+struct A {
+    A(int = 0);  //最好不要创建两个转换源都是算术类型的类型转换
+    A(double);
+    operator int() const; //最好不要创建两个转换对象都是算术类型的转换
+    operator double() const;
+    ...
+};
+
+void f2(long double); //一个函数
+A a;
+//二义性错误
+//含义是f(A::operator int())还是f(A::operator double())
+f2(a);
+
+long lg;
+//二义性错误
+//含义是A::A(int)还是A::A(double)
+A a2(lg);
+```
+
+-   如果转换过程包含标准类型转换，则标准类型转换的级别将决定编译器选择最佳匹配的过程
+-   注意“提升”和“转换”的区别
+
+```c
+short s = 42;
+//把short提示成int优于short转换成double
+//因此调用的是A::A(int)
+A a3(s); 
+```
+
+#### 重载函数与转换构造函数
+
+-   当几个重载函数分属不同的类类型时，如果这些类恰好定义了同样的转换构造函数，则二义性问题将进一步提升：
+
+```c
+struct C {
+    C(int);
+    ...
+};
+
+struct D {
+    D(int);
+    ...
+};
+
+void manip(const C&);
+void manip(const D&);
+//二义性错误
+//含义是manip(C(10))还是manip(D(10))
+manip(10);
+
+//可以显示构造，这样可以消除二义性
+manip(C(10));
+```
+
+#### 重载函数与用户定义的类型转换
+
+```c
+sturct E {
+    E (double);
+    ...
+};
+
+void manip2(const C&);
+void manip2(const E&);
+
+//二义性错误，两个不同的用户定义的类型转换都能用在此处
+//含义是manip2(C(10))还是manip2(E(10))
+//因为调用重载函数所请求的用户定义的类型转换不止一个且彼此不同，所以该调用具有二义性
+manip2(10);
+```
+
+-   上例中，即使其中一个调用需要额外的类型标准转换而另一个调用能精确匹配，编译器也会将该调用标示为错误
+-   在调用重载函数时，如果需要额外的标准类型转换，则该转换的级别只有当所有可行函数都请求同一个用户定义的类型转换时才有用。如果所需的用户定义的类型转换不止一个，则该调用具有二义性
+
+### 14.9.3 函数匹配与重载运算符
+
+-   如果a是一种类类型，则表达式a sym b可能是：
+
+```c
+a.operatorsym(b); //a是一个operator sym()成员函数
+operatorsym(a,b); //operatorsym()是一个普通函数
+```
+
+-   不能通过调用的形式区分开当前调用的是成员函数还是非成员函数
+-   使用运算符时有可能调用的是：
+    -   内置版本
+    -   非成员函数版本
+    -   成员函数版本（如果左侧是类对象）
+-   当我们调用一个命名的函数时，具有该名字的成员函数和非成员函数不会彼此重载，因为使用的是调用命名函数的语法形式
+-   而当我们在表达式中使用重载运算符时，无法判断正在使用的是成员函数还是非成员函数，因此二者都应该在考虑的范围内
+
+```c
+class SmallInt {
+    friend SmallInt operator+(const SmallInt&, const SmallInt&);
+public:
+    SmallInt(int = 0);  //转换源为int的类型转换
+    operator int() const{ return val; }; //转换目标为int的类型转换
+private:
+    std::size_t val;
+};
+
+SmallInt s1,s2;
+SmallInt s3 = s1 + s2; //使用重载的operator+成员函数
+//二义性错误
+//含义是把0转换成SmallInt，然后使用重载的operator+成员函数
+//还是把s3转换成int，使用执行int内置的加法运算
+int i = s3 + 0; 
+```
+
+## 小结
+
+-   赋值、下标、函数调用和箭头运算必须作为类的成员
 
 
