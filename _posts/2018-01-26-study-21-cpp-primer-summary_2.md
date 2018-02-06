@@ -2224,7 +2224,7 @@ p3 = p2; //错误，unique_ptr不支持赋值
 -   但可以通过调用release或reset将指针的所有权从一个（非const）`unique_ptr`转义给另一个`unique_ptr`
 
 ```c
-/将所有权从p1转移给p2
+//将所有权从p1转移给p2
 unique_ptr<string> p2(p1.release());  //release将p1置为空
 unique_ptr<string> p3(new string(“Trex”));
 //将所有权从p3转移给p2
