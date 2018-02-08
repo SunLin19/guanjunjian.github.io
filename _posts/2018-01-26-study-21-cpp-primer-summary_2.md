@@ -2476,6 +2476,8 @@ uninitialized_fill_n(q,vi.size(),42);
 
 -   uninitialized_copy返回（递增后的）目的迭代器，即返回一个指针，指向最后一个构造的元素之后的位置   
 
+---
+
 
 
 
