@@ -1042,7 +1042,7 @@ transform(vi.begin(),vi.end(),vi.begin(),[] (int i) {if(i<0) return -i; else ret
 transform(vi.begin(),vi.end(),vi.begin(),[] (int i)->int  {if(i<0) return -i; else return i;});
 ```
 
-### 10.3.4
+### 10.3.4 参数绑定
 
 -   参考[《参数绑定》](http://www.cnblogs.com/wuchanming/p/3918403.html)
 -   如果lambda的捕获列表为空，通常可以用函数来代替它
