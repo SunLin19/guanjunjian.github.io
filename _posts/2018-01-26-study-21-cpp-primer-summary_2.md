@@ -2441,8 +2441,8 @@ auto const p=alloc.allocate(n);     //分配n个未初始化的string，这里p�
 ```c
 auto q=p;                   //q指向最后构造的元素之后的位置，这里应该是认为假设的，是指上一个构造的元素之后的内存位置，即一个未构造的内存位置
 alloc.construct(q++);           //*q为空字符串，并把q指向下一个未构造的内存位置
-alloc.construct(q++,10,’c’);    //*q为cccccccccc，并把q指向下一个未构造的内存位置
-alloc.construct(q++,”hi”);      //*q为hi！，并把q指向下一个未构造的内存位置
+alloc.construct(q++,10,`c`);    //*q为cccccccccc，并把q指向下一个未构造的内存位置
+alloc.construct(q++,"hi");      //*q为hi！，并把q指向下一个未构造的内存位置
 ```
 
 -   未构造对象（未construct）的情况下就使用原始内存是错误的
