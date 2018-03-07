@@ -441,7 +441,7 @@ cout << e() << " ";
 
 ```c
 //生成0到9之间（包含）均匀分布的随机数
-uniform_random_distribution<unsigned> u(0,9);
+uniform_int_distribution<unsigned> u(0,9);
 //生成无符号随机整数
 default_random_engine e;
 //注意，传入的是e本身，而不是e()
