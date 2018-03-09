@@ -2919,7 +2919,7 @@ cout << debug_rep("hi world!") << endl; //调用debug_rep(T*)
 
 ```c
 //Args是一个模板参数包，表示零或多个模板类型参数
-//rest是一个函数参数包，表示零活对个函数参数
+//rest是一个函数参数包，表示零或对个函数参数
 template <typename T,typename... Args>
 void foo(const T &t,const Args&... rest);
 ```
@@ -2938,7 +2938,7 @@ void foo(const string &t,const int&,const char[3]&);
 
 #### sizeof…运算符
 
--   当我们需要知道包中有多少 元素时，可以使用**sizeof…**运算符
+-   当我们需要知道包中有多少元素时，可以使用**sizeof…**运算符
 -   **sizeof…**返回一个常量表达式，不会对其实参求值
 
 ```c
