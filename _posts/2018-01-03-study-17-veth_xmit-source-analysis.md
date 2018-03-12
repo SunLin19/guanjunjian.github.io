@@ -111,7 +111,7 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 
 ![](http://img.my.csdn.net/uploads/201112/21/0_13244603892DxH.gif)
 
-而根据`veth_newlink()`可以找到，veth的private数据就是`veth_priv`结构体。
+而根据`veth_newlink()`可以找到，veth的private数据被映射为`veth_priv`结构体。
 
 ```c
 struct veth_priv {
@@ -120,6 +120,8 @@ struct veth_priv {
 	unsigned		requested_headroom;
 };
 ```
+
+因此上面代码中`priv = netdev_priv(dev)`就是将dev的私有数据映射为一个`veth_priv`结构体，再把这个结构体的peer设为新生成的peer。同理对`priv = netdev_priv(peer)`将新生成的peer的peer设为dev。
 
 ## 2.3 初始化并启动veth设备
 
@@ -165,7 +167,9 @@ static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 	int length = skb->len;
 
 	rcu_read_lock();
+	//获得dev的peer
 	rcv = rcu_dereference(priv->peer);
+	//如果dev的peer为空，则将该数据包丢弃
 	if (unlikely(!rcv)) {
 		kfree_skb(skb);
 		goto drop;

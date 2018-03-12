@@ -20,7 +20,7 @@ tags:
 
 ## 1. 定义
 
-让我们来定义HTB的目标正式。首先是一些定义：
+让我们来定义HTB的目标。首先是一些定义：
 
 * Class：与Class有关的有，假设速率（assured rate AR），最高速率(ceil rate CR),优先级P，level和quantum Q。Class可以有父节点。还有实际速率R(actual rate)，代表数据包流离开该Class的速率，R每隔一小段时间就会测量一下。对于inner class，它们的R等于所有子孙节点的R的和。
 * Leaf:没有子孙节点的class，只有leaf可以拥有数据包队列(packet queue)。

@@ -86,7 +86,7 @@ tags:
 -   参数：dev表示目的网络设备，如果veth调用的话，就是veth的peer；skb表示要发送的buffer
 -   返回值NET_RX_SUCCESS表示发送成功，没有拥塞；NET_RX_DROP表示skb被丢弃并释放
 -   dev_forward_skb可以被用于在一个网络设备的start_xmit函数中（对于veth就是veth_xmit函数）将一个skb注入到另一个网络设备的接收队列中
--   接收设备有可能存在另一个命名空间中，所以我们必须清楚所有可能破坏命名空间独立性的信息
+-   接收设备有可能存在另一个命名空间中，所以我们必须清除所有可能破坏命名空间独立性的信息
 
 从注释的最后一条可以看出，classid有可能就是因为会破坏命名空间的独立性而被清除掉了。
 
@@ -102,7 +102,7 @@ int dev_forward_skb(struct net_device *dev, struct sk_buff *skb)
 ```
 
 * 若`__dev_forward_skb(dev, skb)`结果为非0，表示出错，直接返回`__dev_forward_skb(dev, skb)`的结果
-* 若`__dev_forward_skb(dev, skb)`结果为为0，表示成功，继续调用`netif_rx_internal(skb)`，并返回`netif_rx_internal(skb)`的结果
+* 若`__dev_forward_skb(dev, skb)`结果为0，表示成功，继续调用`netif_rx_internal(skb)`，并返回`netif_rx_internal(skb)`的结果
 
 -   `__dev_forward_skb()`的工作是：
     -   判断是否符合转发条件
@@ -296,7 +296,7 @@ void skb_scrub_packet(struct sk_buff *skb, bool xnet)
   * @skb: 将要执行孤儿操作的skb
   *
   * 如果buffer现在还有拥有者，那么我们调用拥有者的destructor函数，让@skb成为无拥有者。
-  * 执行该函数后，buffer忍让会存在，但是不由他之前的拥有者管理了
+  * 执行该函数后，buffer仍然会存在，但是不由它之前的拥有者管理了
   */
 ```
 
@@ -395,7 +395,7 @@ static int netif_rx_internal(struct sk_buff *skb)
 }
 ```
 
-从以上代码可以看出，`netif_rx_internal()`的功能是获取适当的cpu，并将skb添加到cpu的per-CPU接收队列中。
+从以上代码可以看出，`netif_rx_internal()`的功能是获取适当的cpu，并将skb添加到cpu的per-cpu接收队列中。
 
 每个per-cpu收包队列都是一个`softnet_data`结构体，该结构体大致如下：
 
@@ -405,7 +405,7 @@ struct softnet_data {
     struct list_head    poll_list;  //连接所有的轮询设备
     struct sk_buff_head process_queue;  //用于非NAPI设备，因为NAPI设备有自己的队列，处理数据时从该队列取，负责处理
     struct sk_buff_head input_pkt_queue;  //用于非NAPI设备，因为NAPI设备有自己的队列，数据包到来时首先填充到该队列，负责接收
-    struct napi_struct  backlog;  //用于NAPI设备，代表一个虚拟设备供轮询使用，当轮询到该设备时，就会使用以上两个队列
+    struct napi_struct  backlog;  //用于非NAPI设备，代表一个虚拟设备供轮询使用，当轮询到该设备时，就会使用以上两个队列
     ...
 }
 ```
