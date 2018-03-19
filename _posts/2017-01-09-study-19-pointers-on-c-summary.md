@@ -1,7 +1,7 @@
 ---
 layout:     post
 title:      "「十九」《C和指针》笔记"
-date:       2018-01-09 10:00:00
+date:       2017-01-09 10:00:00
 author:     "guanjunjian"
 categories: 阅读
 tags:
