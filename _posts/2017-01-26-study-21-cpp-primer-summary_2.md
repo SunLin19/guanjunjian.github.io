@@ -886,7 +886,7 @@ stable_sort(words.begin(),words.end(),[](const string &s1,const string &s2)
 -   一个lambda通过将局部变量包含在其捕获列表中指出将会使用这些变量
 -   捕获列表指引lambda在其内部包含访问局部变量所需的信息
 -   使用捕获列表的例子：
--   
+
 ```c
 //ambda会捕获sz
 [sz] (const string &s)
