@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "「二十一」《C++Primber》笔记 第Ⅱ部分"
+title:      "《C++Primber》笔记 第Ⅱ部分"
 date:       2017-01-26 20:00:00
 author:     "guanjunjian"
 categories: 阅读
