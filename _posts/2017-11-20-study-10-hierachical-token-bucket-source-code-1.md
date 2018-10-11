@@ -263,7 +263,7 @@ errout:
 }  
 ```
 
-还有很多操作，就不详细列出了，具体了解到[ux内核中流量控制(1)](http://cxw06023273.iteye.com/blog/867318)，分别为：
+还有很多操作，就不详细列出了，具体了解到[Linux内核中流量控制(1)](http://cxw06023273.iteye.com/blog/867318)，分别为：
 
 * `qdisc_reset`:调用Qdisc操作函数中的reset函数
 * `qdisc_destroy`:释放Qdisc
