@@ -16,9 +16,9 @@ tags:
 
 >
 > 整理，并转载至[Linux内核中流量控制](http://cxw06023273.iteye.com/blog/867318)系列文章。
->  
+>
 > 来源：http://yfydz.cublog.cn
-> 
+>
 > 内核代码版本为2.6.19.2
 >
 
@@ -290,5 +290,5 @@ errout:
 
 ## 参考
 
-* *[ux内核中流量控制(1)](http://cxw06023273.iteye.com/blog/867318)*
+* *[Linux内核中流量控制(1)](http://cxw06023273.iteye.com/blog/867318)*
 
